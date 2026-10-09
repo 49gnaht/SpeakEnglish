@@ -478,7 +478,15 @@ function parseLesson(text) {
 
 /* ---------- so khớp lời nói ---------- */
 const NUM = { zero: '0', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10' };
-const SAME = { too: 'to', two: 'to', '2': 'to', 'you\'re': 'your', 'it\'s': 'its', 'they\'re': 'their', there: 'their', 'there\'s': 'theres', 'ok': 'okay', 'alright': 'all right' };
+// từ đồng âm máy hay viết lẫn
+const SAME = { too: 'to', two: 'to', '2': 'to', there: 'their', ok: 'okay', alright: 'allright' };
+// viết tắt: tách ra cho cả câu mẫu lẫn lời nói, để "it's" khớp "it is"
+const SHORT = { "can't": 'can not', "won't": 'will not', "shan't": 'shall not', "let's": 'let us', "i'm": 'i am' };
+function expand(w) {
+  if (SHORT[w]) return SHORT[w];
+  return w.replace(/n't$/, ' not').replace(/'re$/, ' are').replace(/'ll$/, ' will')
+    .replace(/'ve$/, ' have').replace(/'d$/, ' would').replace(/'s$/, ' is').replace(/'m$/, ' am');
+}
 function canon(w) {
   w = w.replace(/^'+|'+$/g, '');
   if (NUM[w]) w = NUM[w];
@@ -489,6 +497,7 @@ function normWords(s) {
     .replace(/[’‘`]/g, '\'')
     .replace(/[-–—/]/g, ' ')
     .replace(/[^a-z0-9' ]+/g, ' ')
+    .split(/\s+/).map(w => expand(w.replace(/^'+|'+$/g, ''))).join(' ')
     .split(/\s+/).map(canon).filter(Boolean);
 }
 function lev(a, b) {
@@ -500,16 +509,28 @@ function lev(a, b) {
   return d[a.length][b.length];
 }
 const eq = (a, b) => a === b || (a.length > 4 && b.length > 4 && lev(a, b) <= 1);
-// trả về mảng true/false cho từng từ của câu mẫu
+// trả về mảng true/false cho từng từ của câu mẫu.
+// Cho phép một từ ghép khớp hai từ rời, ví dụ "everyday" với "every day", "cannot" với "can not".
 function align(target, spoken) {
   const n = target.length, m = spoken.length;
-  const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
-  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
-    dp[i][j] = eq(target[i], spoken[j]) ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const dp = Array.from({ length: n + 2 }, () => new Uint16Array(m + 2));
+  const step = (i, j) => {                      // các cách đi tiếp từ (i, j), kèm số từ khớp
+    const out = [];
+    if (eq(target[i], spoken[j])) out.push([1, 1, 1]);
+    if (i + 1 < n && target[i] + target[i + 1] === spoken[j]) out.push([2, 1, 2]);
+    if (j + 1 < m && eq(target[i], spoken[j] + spoken[j + 1])) out.push([1, 2, 1]);
+    return out;
+  };
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) {
+    let best = Math.max(dp[i + 1][j], dp[i][j + 1]);
+    for (const [di, dj, g] of step(i, j)) best = Math.max(best, dp[i + di][j + dj] + g);
+    dp[i][j] = best;
+  }
   const hit = new Array(n).fill(false);
   let i = 0, j = 0;
   while (i < n && j < m) {
-    if (eq(target[i], spoken[j])) { hit[i] = true; i++; j++; }
+    const mv = step(i, j).find(([di, dj, g]) => dp[i + di][j + dj] + g === dp[i][j]);
+    if (mv) { for (let k = 0; k < mv[0]; k++) hit[i + k] = true; i += mv[0]; j += mv[1]; }
     else if (dp[i + 1][j] >= dp[i][j + 1]) i++;
     else j++;
   }
