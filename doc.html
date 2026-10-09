@@ -346,6 +346,7 @@ const IS_ANDROID = /Android/i.test(navigator.userAgent);
 const PASS = 0.85;
 
 const SAMPLE = {
+  id: 'mau-time-management',
   title: 'Time-Management', titleVi: 'Quản lý thời gian',
   items: [
     ['Hello everyone.', 'Xin chào mọi người.'],
@@ -362,6 +363,28 @@ const SAMPLE = {
     ['What is one time-management habit that works well for you?', 'Thói quen quản lý thời gian nào mang lại hiệu quả tốt cho bạn?']
   ]
 };
+const SAMPLE_HOBBY = {
+  id: 'mau-my-favorite-hobby',
+  title: 'My Favorite Hobby', titleVi: 'Sở thích của tôi',
+  items: [
+    ['Hello everyone.', 'Xin chào mọi người.'],
+    ['Today, I want to talk about my favorite hobby.', 'Hôm nay, tôi muốn nói về sở thích yêu thích của mình.'],
+    ['My favorite hobby is listening to music.', 'Sở thích yêu thích của tôi là nghe nhạc.'],
+    ['I like music very much.', 'Tôi rất thích âm nhạc.'],
+    ['I listen to music every day.', 'Tôi nghe nhạc mỗi ngày.'],
+    ['I listen to music in the morning and in the evening.', 'Tôi nghe nhạc vào buổi sáng và buổi tối.'],
+    ['Music makes me feel happy.', 'Âm nhạc làm tôi thấy vui.'],
+    ['It helps me relax after work.', 'Nó giúp tôi thư giãn sau giờ làm.'],
+    ['Sometimes, I listen to music at home.', 'Đôi khi, tôi nghe nhạc ở nhà.'],
+    ['Sometimes, I listen to music when I walk.', 'Đôi khi, tôi nghe nhạc lúc đi bộ.'],
+    ['I like slow music.', 'Tôi thích nhạc chậm.'],
+    ['I also like happy music.', 'Tôi cũng thích nhạc vui.'],
+    ['Music is important in my life.', 'Âm nhạc rất quan trọng trong cuộc sống của tôi.'],
+    ['I enjoy my hobby every day.', 'Ngày nào tôi cũng tận hưởng sở thích của mình.'],
+    ['Thank you for listening.', 'Cảm ơn mọi người đã lắng nghe.']
+  ]
+};
+const SAMPLES = [SAMPLE, SAMPLE_HOBBY];
 
 const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: false, autoNext: false, noConcurrent: IS_ANDROID, silent: 0 };
 let L = null, idx = 0;
@@ -378,14 +401,24 @@ function putLesson(l) {
   if (i >= 0) all[i] = l; else all.unshift(l);
   writeLessons(all);
 }
+// Thêm các bài mẫu chưa từng thêm; bài mẫu đã bị xóa thì không thêm lại
 function seed() {
-  let raw = null;
-  try { raw = localStorage.getItem(KEY); } catch {}
-  if (raw !== null) return;
-  writeLessons([{
-    id: 'mau-time-management', title: SAMPLE.title, titleVi: SAMPLE.titleVi,
-    items: SAMPLE.items.map(([en, vi]) => ({ en, vi })), best: {}, last: 0, created: Date.now()
-  }]);
+  const SEEN = 'speak.samples.v1';
+  let hasLessons = false, seen = null;
+  try { hasLessons = localStorage.getItem(KEY) !== null; seen = JSON.parse(localStorage.getItem(SEEN)); } catch {}
+  if (!Array.isArray(seen)) seen = hasLessons ? [SAMPLE.id] : [];   // máy đã dùng bản trước: bài Time-Management đã có
+  const all = lessons();
+  for (const smp of SAMPLES) {
+    if (seen.includes(smp.id)) continue;
+    seen.push(smp.id);
+    if (all.some(l => l.id === smp.id)) continue;
+    all.push({
+      id: smp.id, title: smp.title, titleVi: smp.titleVi,
+      items: smp.items.map(([en, vi]) => ({ en, vi })), best: {}, last: 0, created: Date.now()
+    });
+  }
+  writeLessons(all);
+  try { localStorage.setItem(SEEN, JSON.stringify(seen)); } catch {}
 }
 function loadPrefs() {
   try {
