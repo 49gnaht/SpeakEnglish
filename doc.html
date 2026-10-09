@@ -170,6 +170,11 @@ textarea { min-height: 180px; resize: vertical; line-height: 1.5; }
 .result.pass .badge { color: var(--good); }
 .result.fail .badge { color: var(--bad); }
 .heard { color: var(--muted); font-size: var(--t-xs); overflow-wrap: anywhere; min-width: 0; flex: 1 1 200px; }
+.self { display: grid; gap: 8px; }
+.btn.rec { border-color: var(--rec); color: var(--rec); font-weight: 600; }
+.btn.rec .dot { width: 12px; height: 12px; border-radius: 50%; background: currentColor; }
+.btn.rec[aria-pressed="true"] { background: var(--rec); color: var(--on-rec); }
+.btn.rec[aria-pressed="true"] .dot { border-radius: 2px; }
 .live { min-height: 1.5em; color: var(--muted); font-style: italic; overflow-wrap: anywhere; }
 .msg { padding: 10px 14px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--bad); }
 
@@ -283,9 +288,15 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
     <div class="result" id="result" hidden>
       <span class="badge" id="badge"></span>
       <span class="heard" id="heard"></span>
-      <button class="btn small" type="button" id="playBack" hidden>Nghe lại giọng mình</button>
     </div>
     <p class="live" id="live" aria-live="polite"></p>
+    <div class="self">
+      <div class="row">
+        <button class="btn rec" type="button" id="recOnly" aria-pressed="false" hidden><span class="dot" aria-hidden="true"></span><span id="recOnlyText">Thu âm</span></button>
+        <button class="btn" type="button" id="playBack" hidden>Nghe lại giọng mình</button>
+      </div>
+      <p class="hint" id="recHint" hidden>Trên điện thoại này, nút Nói chỉ dùng để chấm. Muốn nghe lại giọng mình, bấm Thu âm, đọc câu rồi bấm Dừng thu.</p>
+    </div>
 
     <details class="more">
       <summary>Tùy chọn</summary>
@@ -309,7 +320,7 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
         </div>
       </div>
     </details>
-    <p class="keys">Phím tắt: <kbd>L</kbd> nghe mẫu, <kbd>Space</kbd> nói, <kbd>←</kbd> <kbd>→</kbd> đổi câu, <kbd>D</kbd> bật tắt dịch, <kbd>H</kbd> đổi mức che chữ.</p>
+    <p class="keys">Phím tắt: <kbd>L</kbd> nghe mẫu, <kbd>Space</kbd> nói, <kbd>R</kbd> thu âm, <kbd>←</kbd> <kbd>→</kbd> đổi câu, <kbd>D</kbd> bật tắt dịch, <kbd>H</kbd> đổi mức che chữ.</p>
   </section>
 </div>
 
@@ -330,7 +341,8 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
 
 const $ = id => document.getElementById(id);
 const KEY = 'speak.lessons.v1';
-const PREF = 'speak.prefs.v1';
+const PREF = 'speak.prefs.v2';
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
 const PASS = 0.85;
 
 const SAMPLE = {
@@ -351,7 +363,7 @@ const SAMPLE = {
   ]
 };
 
-const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: true, autoNext: true, noConcurrent: false, silent: 0 };
+const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: false, autoNext: false, noConcurrent: IS_ANDROID, silent: 0 };
 let L = null, idx = 0;
 let peek = false, viOne = false, result = null, selfCheck = false;
 let msgTimer = null, nextTimer = null;
@@ -376,7 +388,12 @@ function seed() {
   }]);
 }
 function loadPrefs() {
-  try { Object.assign(P, JSON.parse(localStorage.getItem(PREF)) || {}); } catch {}
+  try {
+    const v2 = JSON.parse(localStorage.getItem(PREF));
+    if (v2) { Object.assign(P, v2); return; }
+    const v1 = JSON.parse(localStorage.getItem('speak.prefs.v1')) || {};   // bản cũ: chỉ giữ lựa chọn hiển thị
+    for (const k of ['level', 'showVi', 'rate', 'voice']) if (k in v1) P[k] = v1[k];
+  } catch {}
 }
 function savePrefs() { try { localStorage.setItem(PREF, JSON.stringify(P)); } catch {} }
 
@@ -543,7 +560,7 @@ function markSpeaking(ci) {
 
 /* ---------- nghe người dùng nói ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null, listening = false, listenToken = 0;
+let rec = null, listening = false, listenToken = 0, selfRec = false;
 let mr = null, mrStream = null, mrChunks = [], mrPeak = 0, mrTimer = null, actx = null;
 let backUrl = null;
 const audio = $('audio');
@@ -593,17 +610,41 @@ function setBack(blob) {
   if (backUrl) { URL.revokeObjectURL(backUrl); backUrl = null; }
   audio.removeAttribute('src');
   if (blob) { backUrl = URL.createObjectURL(blob); audio.src = backUrl; }
-  $('playBack').hidden = !backUrl;
+  renderSelf();
+}
+function renderSelf() {
+  const separate = !!SR && P.noConcurrent;
+  $('recOnly').hidden = !separate; $('recHint').hidden = !separate;
+  $('recOnly').setAttribute('aria-pressed', String(selfRec));
+  $('recOnlyText').textContent = selfRec ? 'Dừng thu' : 'Thu âm';
+  $('playBack').hidden = !backUrl || selfRec;
+}
+async function toggleSelfRec() {
+  if (selfRec) {
+    const blob = await stopRecorder(true);
+    selfRec = false; setBack(blob);
+    if (!blob) say('Chưa thu được gì. Bấm Thu âm rồi đọc lại.');
+    return;
+  }
+  if (listening) stopAll();
+  clearTimeout(nextTimer); stopSpeaking(); audio.pause(); say('');
+  let ok = false;
+  try { ok = await startRecorder(); }
+  catch { say('Trang chưa được dùng micro. Cho phép micro trong cài đặt trình duyệt rồi bấm Thu âm lại.', true); return; }
+  if (!ok) { say('Trình duyệt này không thu âm được.'); return; }
+  selfRec = true; setBack(null);
 }
 
 async function toggleSpeak() {
   if (listening) { stopListening(); return; }
   clearTimeout(nextTimer);
+  if (selfRec) { const blob = await stopRecorder(true); selfRec = false; setBack(blob); }
   stopSpeaking(); audio.pause();
-  result = null; selfCheck = false; setBack(null); $('live').textContent = ''; say('');
+  result = null; selfCheck = false; $('live').textContent = ''; say('');
   render();
-  if (!SR) return recordOnly();
+  if (!SR) { setBack(null); return recordOnly(); }
   let useRec = !P.noConcurrent;
+  if (useRec) setBack(null);
   if (useRec) {
     try { useRec = await startRecorder(); }
     catch { say('Trang chưa được dùng micro. Cho phép micro trong cài đặt trình duyệt rồi bấm Nói lại.', true); return; }
@@ -632,7 +673,7 @@ function listen(withRec, retried) {
     if (my !== listenToken || at !== idx) { stopRecorder(false); return; }   // đã đổi câu hoặc dừng hẳn
     if (err === 'audio-capture' && withRec && !retried) {
       await stopRecorder(false);
-      P.noConcurrent = true; savePrefs();
+      P.noConcurrent = true; savePrefs(); renderSelf();
       listen(false, true);
       return;
     }
@@ -655,9 +696,9 @@ function listen(withRec, retried) {
     if (blob && mrPeak < 0.01) {
       P.silent = (P.silent || 0) + 1;              // hai lần liền thu ra im lặng thì thôi thu
       if (P.silent >= 2) P.noConcurrent = true;
-      savePrefs(); setBack(null);
-    } else {
-      if (blob && P.silent) { P.silent = 0; savePrefs(); }
+      savePrefs(); renderSelf();
+    } else if (blob) {
+      if (P.silent) { P.silent = 0; savePrefs(); }
       setBack(blob);
     }
     const cands = [heard];
@@ -784,7 +825,7 @@ function render() {
   $('pos').textContent = 'Câu ' + (idx + 1) + ' / ' + L.items.length;
   setSeg('level', P.level); setSeg('viMode', P.showVi ? 1 : 0); setSeg('rate', P.rate);
   $('autoMic').checked = P.autoMic; $('autoNext').checked = P.autoNext;
-  renderSentence(); renderResult(); renderDots(); renderDock();
+  renderSentence(); renderResult(); renderDots(); renderDock(); renderSelf();
 }
 
 function renderList() {
@@ -817,7 +858,7 @@ function stopAll() {
   listenToken++;
   if (rec) { try { rec.abort(); } catch {} rec = null; }
   if (mr) stopRecorder(false);
-  listening = false;
+  listening = false; selfRec = false;
   audio.pause();
 }
 function go(i) {
@@ -922,6 +963,7 @@ $('viOne').addEventListener('click', () => { viOne = !viOne; render(); });
 $('autoMic').addEventListener('change', e => { P.autoMic = e.target.checked; savePrefs(); });
 $('autoNext').addEventListener('change', e => { P.autoNext = e.target.checked; savePrefs(); if (!P.autoNext) clearTimeout(nextTimer); renderResult(); });
 $('voice').addEventListener('change', e => { P.voice = e.target.value; savePrefs(); });
+$('recOnly').addEventListener('click', toggleSelfRec);
 $('playBack').addEventListener('click', () => {
   if (!backUrl) return;
   clearTimeout(nextTimer); stopSpeaking();
@@ -951,6 +993,7 @@ document.addEventListener('keydown', e => {
   switch (e.key) {
     case ' ': if (onButton) return; e.preventDefault(); toggleSpeak(); break;
     case 'l': case 'L': $('listen').click(); break;
+    case 'r': case 'R': if (!$('recOnly').hidden) toggleSelfRec(); break;
     case 'ArrowLeft': e.preventDefault(); go(idx - 1); break;
     case 'ArrowRight': e.preventDefault(); go(idx + 1); break;
     case 'd': case 'D': P.showVi = !P.showVi; savePrefs(); render(); break;
