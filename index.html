@@ -79,6 +79,10 @@ h1, h2, p, ul, ol { margin: 0; padding: 0; }
 }
 
 /* ---------- header ---------- */
+.modes { display: inline-flex; justify-self: start; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; }
+.modes a { padding: 8px 14px; color: var(--muted); text-decoration: none; font-weight: 500; }
+.modes a + a { border-left: 1px solid var(--line); }
+.modes a[aria-current="page"] { background: var(--ink); color: var(--bg); }
 .top { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .top h1 { font-size: var(--t-lg); font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; }
 .open { display: flex; gap: 8px; }
@@ -205,6 +209,10 @@ h1, h2, p, ul, ol { margin: 0; padding: 0; }
 <div class="app">
 
   <header class="top">
+    <nav class="modes" aria-label="Chọn cách luyện">
+      <a href="./" aria-current="page">Video</a>
+      <a href="doc.html">Bài viết</a>
+    </nav>
     <h1>Luyện shadowing</h1>
     <form class="open" id="open">
       <label class="sr" for="link">Link YouTube</label>
