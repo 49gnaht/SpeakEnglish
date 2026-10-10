@@ -309,7 +309,8 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
             <button type="button" data-v="1.05">Nhanh</button>
           </div>
         </div>
-        <label class="check"><input type="checkbox" id="autoMic"> Nghe mẫu xong tự mở micro</label>
+        <label class="check"><input type="checkbox" id="loopListen"> Nút Nghe đọc lặp lại đến khi bấm Dừng (bỏ chọn để chỉ đọc 1 lần)</label>
+        <label class="check"><input type="checkbox" id="autoMic"> Nghe mẫu xong tự mở micro (khi chỉ đọc 1 lần)</label>
         <label class="check"><input type="checkbox" id="autoNext"> Nói đạt thì tự sang câu sau</label>
         <div class="opt">
           <label class="opt-label" for="voice">Giọng đọc mẫu</label>
@@ -386,7 +387,7 @@ const SAMPLE_HOBBY = {
 };
 const SAMPLES = [SAMPLE, SAMPLE_HOBBY];
 
-const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: false, autoNext: false, noConcurrent: IS_ANDROID, silent: 0 };
+const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: false, autoNext: false, loopListen: true, noConcurrent: IS_ANDROID, silent: 0 };
 let L = null, idx = 0;
 let peek = false, viOne = false, result = null, selfCheck = false;
 let msgTimer = null, nextTimer = null;
@@ -596,11 +597,21 @@ function speakText(text, onEnd) {
     if (ok && onEnd) onEnd();
   };
   u.onend = () => done(true);
-  u.onerror = () => done(false);
+  u.onerror = () => { if (my === sayToken) looping = false; done(false); };
   speaking = true; renderDock();
   synth.speak(u);
 }
+const LOOP_GAP = 1200;   // nghỉ giữa hai lần đọc lặp
+let looping = false, loopTimer = null;
+function playModel() {
+  if (!L) return;
+  speakText(cur().en, () => {
+    if (looping) loopTimer = setTimeout(() => { loopTimer = null; if (looping) playModel(); }, LOOP_GAP);
+    else if (P.autoMic && !listening) toggleSpeak();
+  });
+}
 function stopSpeaking() {
+  looping = false; clearTimeout(loopTimer); loopTimer = null;
   if (!synth) return;
   sayToken++;
   if (synth.speaking || synth.pending) synth.cancel();
@@ -868,7 +879,7 @@ function renderDots() {
   });
 }
 function renderDock() {
-  $('listenText').textContent = speaking ? 'Dừng' : 'Nghe';
+  $('listenText').textContent = speaking || looping ? 'Dừng' : 'Nghe';
   $('speak').setAttribute('aria-pressed', String(listening));
   $('speakText').textContent = listening ? 'Xong' : 'Nói';
   if (L) { $('prev').disabled = idx === 0; $('next').disabled = idx >= L.items.length - 1; }
@@ -878,7 +889,8 @@ function render() {
   $('pTitle').textContent = L.title || 'Bài không tên';
   $('pos').textContent = 'Câu ' + (idx + 1) + ' / ' + L.items.length;
   setSeg('level', P.level); setSeg('viMode', P.showVi ? 1 : 0); setSeg('rate', P.rate);
-  $('autoMic').checked = P.autoMic; $('autoNext').checked = P.autoNext;
+  $('autoMic').checked = P.autoMic; $('autoNext').checked = P.autoNext; $('loopListen').checked = P.loopListen;
+  $('autoMic').disabled = P.loopListen;
   renderSentence(); renderResult(); renderDots(); renderDock(); renderSelf();
 }
 
@@ -1000,10 +1012,11 @@ $('copyPrompt').addEventListener('click', async () => {
 /* ---------- sự kiện màn luyện ---------- */
 $('listen').addEventListener('click', () => {
   if (!L) return;
-  if (speaking) { stopSpeaking(); renderDock(); return; }
+  if (speaking || looping) { stopSpeaking(); renderDock(); return; }
   if (listening) stopAll();
   clearTimeout(nextTimer);
-  speakText(cur().en, () => { if (P.autoMic && !listening) toggleSpeak(); });
+  looping = P.loopListen;
+  playModel();
 });
 $('speak').addEventListener('click', toggleSpeak);
 $('prev').addEventListener('click', () => go(idx - 1));
@@ -1015,6 +1028,11 @@ $('rate').addEventListener('click', e => { const b = e.target.closest('button');
 $('peek').addEventListener('click', () => { peek = true; render(); });
 $('viOne').addEventListener('click', () => { viOne = !viOne; render(); });
 $('autoMic').addEventListener('change', e => { P.autoMic = e.target.checked; savePrefs(); });
+$('loopListen').addEventListener('change', e => {
+  P.loopListen = e.target.checked; savePrefs();
+  if (!P.loopListen) looping = false;   // đang lặp thì đọc nốt lần này rồi thôi
+  render();
+});
 $('autoNext').addEventListener('change', e => { P.autoNext = e.target.checked; savePrefs(); if (!P.autoNext) clearTimeout(nextTimer); renderResult(); });
 $('voice').addEventListener('change', e => { P.voice = e.target.value; savePrefs(); });
 $('recOnly').addEventListener('click', toggleSelfRec);
