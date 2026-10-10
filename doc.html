@@ -152,6 +152,7 @@ textarea { min-height: 180px; resize: vertical; line-height: 1.5; }
 .dot.ok { background: var(--good); border-color: var(--good); }
 .dot.try { background: var(--bad-bg); border-color: var(--bad); }
 .dot[aria-current="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
+.dot.q { border-style: dashed; border-color: var(--ink); }
 
 .card { display: grid; gap: 14px; padding: 22px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; min-width: 0; }
 .sent { font-size: var(--t-xl); line-height: 1.5; font-weight: 500; overflow-wrap: anywhere; }
@@ -197,6 +198,26 @@ select.field { height: 44px; padding: 0 10px; }
 .btn.speak[aria-pressed="true"] svg { animation: pulse 1s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: 0.4; } }
 @media (prefers-reduced-motion: reduce) { .btn.speak[aria-pressed="true"] svg { animation: none; } .w { transition: none; } }
+/* cả bài */
+#practice[data-mode="1"] .only-s, #practice[data-mode="0"] .only-w { display: none !important; }
+.modesw { justify-self: start; }
+.modesw button { min-height: 42px; padding: 0 16px; font-size: var(--t-sm); }
+.whole { font-size: 18px; line-height: 1.8; overflow-wrap: anywhere; }
+.whole .s { border-radius: 6px; padding: 2px 3px; cursor: pointer; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.whole .s.now { background: var(--lane); }
+.whole.stack { display: grid; gap: 10px; line-height: 1.6; }
+.whole.stack .s { display: block; }
+.whole .svi { display: block; font-size: var(--t-xs); color: var(--muted); margin-top: 2px; line-height: 1.5; }
+.weak { display: grid; gap: 6px; flex-basis: 100%; }
+.weak ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: var(--t-xs); }
+.weak ol span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.result details { flex-basis: 100%; font-size: var(--t-xs); color: var(--muted); }
+.result details summary { cursor: pointer; }
+.dock-in.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+.guide { display: grid; gap: 12px; padding-top: 8px; }
+.guide h2 { font-size: var(--t-md); font-weight: 700; }
+.guide .steps > li { font-size: var(--t-sm); }
+.guide .steps span { color: var(--muted); display: block; font-size: var(--t-xs); }
 .keys { font-size: var(--t-xs); color: var(--muted); }
 .keys kbd { font: inherit; font-weight: 600; color: var(--ink); padding: 0 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
 @media (hover: none) { .keys { display: none; } }
@@ -219,6 +240,16 @@ select.field { height: 44px; padding: 0 10px; }
     </div>
     <ul class="list" id="lessonList"></ul>
     <p class="hint" id="noLessons" hidden>Chưa có bài nào. Bấm Tạo bài mới, gửi ảnh cho ChatGPT rồi dán kết quả vào là luyện được.</p>
+    <section class="guide" aria-labelledby="guideHead">
+      <h2 id="guideHead">Cách luyện một bài cho hiệu quả</h2>
+      <ol class="steps">
+        <li><div class="step"><b>Nghe cả bài hai, ba lượt</b><span>Chọn Cả bài rồi bấm Nghe cả bài. Chưa cần nói, chỉ nghe cho quen nhịp và cách nối âm.</span></div></li>
+        <li><div class="step"><b>Luyện từng câu đến khi các chấm xanh gần hết</b><span>Chọn Từng câu. Bấm Nghe, nhại theo vài lần, rồi bấm Nói để máy chấm. Từ nào đỏ thì nghe lại và nói lại câu đó.</span></div></li>
+        <li><div class="step"><b>Nói cả bài, bắt đầu ở mức Hiện hết</b><span>Chọn Cả bài, bấm Nói cả bài và đọc liền một mạch. Xong bài, máy tô xanh đỏ và chỉ ra các câu còn yếu.</span></div></li>
+        <li><div class="step"><b>Luyện lại các câu còn yếu</b><span>Bấm Luyện các câu này ở phần kết quả. Trang chỉ đưa bạn qua những câu đó.</span></div></li>
+        <li><div class="step"><b>Nói cả bài ở mức Chữ đầu, rồi Che hết</b><span>Khi đã đúng trên 90% ở mức trước thì tăng mức. Hôm sau mở lại, nói cả bài trước để xem mình còn nhớ đến đâu.</span></div></li>
+      </ol>
+    </section>
   </section>
 
   <!-- tạo bài -->
@@ -254,8 +285,15 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
     <a class="link muted" href="#">← Bài đã lưu</a>
     <div class="p-top">
       <h1 id="pTitle"></h1>
-      <span class="pos" id="pos"></span>
-      <div class="dots" id="dots" role="group" aria-label="Chọn câu"></div>
+      <div class="seg modesw" id="mode" role="group" aria-label="Cách luyện">
+        <button type="button" data-v="0">Từng câu</button>
+        <button type="button" data-v="1">Cả bài</button>
+      </div>
+      <div class="only-s p-top">
+        <div class="row"><span class="pos" id="pos"></span><button class="link" type="button" id="clearQueue" hidden>Luyện tất cả các câu</button></div>
+        <div class="dots" id="dots" role="group" aria-label="Chọn câu"></div>
+      </div>
+      <span class="pos only-w" id="wLast"></span>
     </div>
 
     <div class="opts">
@@ -276,7 +314,7 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
       </div>
     </div>
 
-    <article class="card">
+    <article class="card only-s">
       <p class="sent" id="sent" lang="en"></p>
       <p class="vi" id="vi" hidden></p>
       <div class="card-links">
@@ -285,17 +323,36 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
       </div>
     </article>
 
-    <div class="result" id="result" hidden>
+    <div class="result only-s" id="result" hidden>
       <span class="badge" id="badge"></span>
       <span class="heard" id="heard"></span>
     </div>
-    <p class="live" id="live" aria-live="polite"></p>
+    <p class="live only-s" id="live" aria-live="polite"></p>
+
+    <article class="card only-w">
+      <div class="whole" id="whole" lang="en"></div>
+      <div class="card-links">
+        <button class="link" type="button" id="wPeek">Xem cả bài</button>
+        <span class="hint">Bấm vào một câu để nghe từ câu đó.</span>
+      </div>
+    </article>
+    <div class="result only-w" id="wResult" hidden>
+      <span class="badge" id="wBadge"></span>
+      <span class="heard" id="wStats"></span>
+      <div class="weak" id="wWeak" hidden>
+        <b>Câu còn yếu</b>
+        <ol id="wWeakList"></ol>
+        <div class="row"><button class="btn small" type="button" id="wDrill">Luyện các câu này</button></div>
+      </div>
+      <details><summary>Máy nghe được</summary><p id="wHeard"></p></details>
+    </div>
+    <p class="live only-w" id="wLive" aria-live="polite"></p>
     <div class="self">
       <div class="row">
         <button class="btn rec" type="button" id="recOnly" aria-pressed="false" hidden><span class="dot" aria-hidden="true"></span><span id="recOnlyText">Thu âm</span></button>
         <button class="btn" type="button" id="playBack" hidden>Nghe lại giọng mình</button>
       </div>
-      <p class="hint" id="recHint" hidden>Trên điện thoại này, nút Nói chỉ dùng để chấm. Muốn nghe lại giọng mình, bấm Thu âm, đọc câu rồi bấm Dừng thu.</p>
+      <p class="hint" id="recHint" hidden>Trên điện thoại này, nút Nói chỉ dùng để chấm. Muốn nghe lại giọng mình, bấm Thu âm, đọc rồi bấm Dừng thu.</p>
     </div>
 
     <details class="more">
@@ -309,7 +366,7 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
             <button type="button" data-v="1.05">Nhanh</button>
           </div>
         </div>
-        <label class="check"><input type="checkbox" id="loopListen"> Nút Nghe đọc lặp lại đến khi bấm Dừng (bỏ chọn để chỉ đọc 1 lần)</label>
+        <label class="check"><input type="checkbox" id="loopListen"> Nút Nghe đọc lặp lại đến khi bấm Dừng, cả câu lẫn cả bài (bỏ chọn để chỉ đọc 1 lần)</label>
         <label class="check"><input type="checkbox" id="autoMic"> Nghe mẫu xong tự mở micro (khi chỉ đọc 1 lần)</label>
         <label class="check"><input type="checkbox" id="autoNext"> Nói đạt thì tự sang câu sau</label>
         <div class="opt">
@@ -321,12 +378,12 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
         </div>
       </div>
     </details>
-    <p class="keys">Phím tắt: <kbd>L</kbd> nghe mẫu, <kbd>Space</kbd> nói, <kbd>R</kbd> thu âm, <kbd>←</kbd> <kbd>→</kbd> đổi câu, <kbd>D</kbd> bật tắt dịch, <kbd>H</kbd> đổi mức che chữ.</p>
+    <p class="keys">Phím tắt: <kbd>L</kbd> nghe mẫu, <kbd>Space</kbd> nói, <kbd>R</kbd> thu âm, <kbd>←</kbd> <kbd>→</kbd> đổi câu, <kbd>D</kbd> bật tắt dịch, <kbd>H</kbd> đổi mức che chữ, <kbd>W</kbd> đổi Từng câu và Cả bài.</p>
   </section>
 </div>
 
 <div class="dock" id="dock" hidden>
-  <div class="dock-in">
+  <div class="dock-in" id="dockIn">
     <button class="btn" type="button" id="prev" aria-label="Câu trước"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 4.5 8 12l7.5 7.5 1.5-1.5-6-6 6-6z"/></svg></button>
     <button class="btn" type="button" id="listen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4.5v-15L8 9zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg><span id="listenText">Nghe</span></button>
     <button class="btn primary speak" type="button" id="speak" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14.5a3.5 3.5 0 0 0 3.5-3.5V5a3.5 3.5 0 0 0-7 0v6a3.5 3.5 0 0 0 3.5 3.5zm6-3.5a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V21h2v-2.1a8 8 0 0 0 7-7.9z"/></svg><span id="speakText">Nói</span></button>
@@ -387,10 +444,10 @@ const SAMPLE_HOBBY = {
 };
 const SAMPLES = [SAMPLE, SAMPLE_HOBBY];
 
-const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: false, autoNext: false, loopListen: true, noConcurrent: IS_ANDROID, silent: 0 };
+const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: false, autoNext: false, loopListen: true, mode: 0, noConcurrent: IS_ANDROID, silent: 0 };
 let L = null, idx = 0;
 let peek = false, viOne = false, result = null, selfCheck = false;
-let msgTimer = null, nextTimer = null;
+let msgTimer = null, nextTimer = null, queue = null;
 
 /* ---------- lưu trên máy ---------- */
 function lessons() {
@@ -511,11 +568,14 @@ function lev(a, b) {
 }
 const eq = (a, b) => a === b || (a.length > 4 && b.length > 4 && lev(a, b) <= 1);
 // trả về mảng true/false cho từng từ của câu mẫu.
+// Ưu tiên khớp được nhiều từ nhất; nếu ngang nhau thì ưu tiên các từ khớp liền nhau,
+// để một từ không bị gắn nhầm sang câu khác khi người nói bỏ sót cả câu.
 // Cho phép một từ ghép khớp hai từ rời, ví dụ "everyday" với "every day", "cannot" với "can not".
 function align(target, spoken) {
-  const n = target.length, m = spoken.length;
-  const dp = Array.from({ length: n + 2 }, () => new Uint16Array(m + 2));
-  const step = (i, j) => {                      // các cách đi tiếp từ (i, j), kèm số từ khớp
+  const n = target.length, m = spoken.length, W2 = m + 2, K = 1000;
+  const F = new Int32Array((n + 2) * W2 * 2);
+  const at = (i, j, c) => (i * W2 + j) * 2 + c;
+  const moves = (i, j) => {
     const out = [];
     if (eq(target[i], spoken[j])) out.push([1, 1, 1]);
     if (i + 1 < n && target[i] + target[i + 1] === spoken[j]) out.push([2, 1, 2]);
@@ -523,17 +583,22 @@ function align(target, spoken) {
     return out;
   };
   for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) {
-    let best = Math.max(dp[i + 1][j], dp[i][j + 1]);
-    for (const [di, dj, g] of step(i, j)) best = Math.max(best, dp[i + di][j + dj] + g);
-    dp[i][j] = best;
+    const mv = moves(i, j);
+    const skip = Math.max(F[at(i + 1, j, 0)], F[at(i, j + 1, 0)]);
+    for (let c = 0; c < 2; c++) {          // c = 1: bước trước vừa khớp liền kề
+      let best = skip;
+      for (const [di, dj, g] of mv) best = Math.max(best, F[at(i + di, j + dj, 1)] + K * g + c);
+      F[at(i, j, c)] = best;
+    }
   }
   const hit = new Array(n).fill(false);
-  let i = 0, j = 0;
+  let i = 0, j = 0, c = 0;
   while (i < n && j < m) {
-    const mv = step(i, j).find(([di, dj, g]) => dp[i + di][j + dj] + g === dp[i][j]);
-    if (mv) { for (let k = 0; k < mv[0]; k++) hit[i + k] = true; i += mv[0]; j += mv[1]; }
-    else if (dp[i + 1][j] >= dp[i][j + 1]) i++;
-    else j++;
+    const cur = F[at(i, j, c)];
+    if (F[at(i + 1, j, 0)] === cur) { i++; c = 0; continue; }
+    const mv = moves(i, j).find(([di, dj, g]) => F[at(i + di, j + dj, 1)] + K * g + c === cur);
+    if (mv) { for (let k = 0; k < mv[0]; k++) hit[i + k] = true; i += mv[0]; j += mv[1]; c = 1; }
+    else { j++; c = 0; }
   }
   return hit;
 }
@@ -593,7 +658,9 @@ function speakText(text, onEnd) {
   u.onboundary = e => { if (my === sayToken && (!e.name || e.name === 'word')) markSpeaking(e.charIndex); };
   const done = ok => {
     if (my !== sayToken) return;
-    speaking = false; markSpeaking(-1); renderDock();
+    speaking = false; markSpeaking(-1);
+    if (!ok) { wPlaying = false; playIdx = -1; markNow(); }
+    renderDock();
     if (ok && onEnd) onEnd();
   };
   u.onend = () => done(true);
@@ -612,15 +679,58 @@ function playModel() {
 }
 function stopSpeaking() {
   looping = false; clearTimeout(loopTimer); loopTimer = null;
+  if (wPlaying) { wPlaying = false; playIdx = -1; markNow(); }
   if (!synth) return;
   sayToken++;
   if (synth.speaking || synth.pending) synth.cancel();
   speaking = false; markSpeaking(-1);
 }
 function markSpeaking(ci) {
-  for (const s of $('sent').querySelectorAll('.w')) {
+  const root = P.mode === 1 ? ($('whole').querySelector('.s.now') || $('whole')) : $('sent');
+  for (const s of root.querySelectorAll('.w')) {
     s.classList.toggle('speaking', ci >= 0 && ci >= +s.dataset.s && ci < +s.dataset.e);
   }
+}
+
+/* ---------- nghe cả bài ---------- */
+let wPlaying = false, playIdx = -1, playFrom = 0, playStart = 0;
+function markNow() {
+  for (const el of $('whole').querySelectorAll('.s')) el.classList.toggle('now', +el.dataset.i === playIdx);
+}
+function playWhole(from) {
+  stopAll(); say('');
+  wPlaying = true; looping = P.loopListen;
+  playIdx = from; playFrom = from; playStart = performance.now();
+  wholeStep();
+}
+function wholeStep() {
+  markNow();
+  const el = $('whole').querySelector('.s.now');
+  if (el && el.scrollIntoView) {
+    const r = el.getBoundingClientRect(), dockTop = $('dock').getBoundingClientRect().top;
+    if (r.top < 0 || r.bottom > dockTop) el.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }
+  speakText(L.items[playIdx].en, () => {
+    if (!wPlaying) return;
+    if (playIdx < L.items.length - 1) {
+      playIdx++;
+      loopTimer = setTimeout(() => { loopTimer = null; if (wPlaying) wholeStep(); }, 250);
+      return;
+    }
+    if (playFrom === 0) saveModelPace(performance.now() - playStart);
+    if (looping) {
+      playIdx = 0; playFrom = 0; markNow();
+      loopTimer = setTimeout(() => { loopTimer = null; if (wPlaying) { playStart = performance.now(); wholeStep(); } }, LOOP_GAP + 600);
+    } else { wPlaying = false; playIdx = -1; markNow(); renderDock(); }
+  });
+  renderDock();
+}
+function wordCount() { return L.items.reduce((n, it) => n + normWords(it.en).length, 0); }
+function saveModelPace(ms) {
+  if (ms < 2000) return;
+  L.pace = L.pace || {};
+  L.pace[P.rate] = Math.round(wordCount() / (ms / 60000));
+  putLesson(L);
 }
 
 /* ---------- nghe người dùng nói ---------- */
@@ -691,7 +801,7 @@ async function toggleSelfRec() {
     if (!blob) say('Chưa thu được gì. Bấm Thu âm rồi đọc lại.');
     return;
   }
-  if (listening) stopAll();
+  if (listening || W.active) stopAll();
   clearTimeout(nextTimer); stopSpeaking(); audio.pause(); say('');
   let ok = false;
   try { ok = await startRecorder(); }
@@ -792,6 +902,160 @@ async function recordOnlyStop() {
   setBack(blob); renderDock(); render();
 }
 
+/* ---------- nói cả bài ---------- */
+const FATAL = ['not-allowed', 'service-not-allowed', 'network', 'language-not-supported', 'audio-capture'];
+const W = { active: false, token: 0, finals: [], cur: '', interim: '', t0: 0, timer: null, err: null, withRec: false, retried: false, rec: null, done: true, result: null, live: null, peek: false };
+function evaluateWhole(heard) {
+  const flat = [], owner = [], marks = [], per = [];
+  L.items.forEach((it, si) => {
+    const toks = tokens(it.en);
+    marks[si] = toks.map(t => (t.subs.length ? true : null));
+    per[si] = { hits: 0, total: 0 };
+    toks.forEach((t, k) => t.subs.forEach(w => { flat.push(w); owner.push([si, k]); per[si].total++; }));
+  });
+  const hit = align(flat, normWords(heard));
+  let hits = 0;
+  hit.forEach((h, f) => {
+    const [si, k] = owner[f];
+    if (h) { hits++; per[si].hits++; } else marks[si][k] = false;
+  });
+  return { score: flat.length ? hits / flat.length : 0, hits, total: flat.length, marks, per, heard };
+}
+function heardSoFar() { return [...W.finals, W.cur].join(' ').replace(/\s+/g, ' ').trim(); }
+async function toggleWhole() {
+  if (W.active) { stopWhole(); return; }
+  stopAll(); say('');
+  W.result = null; W.live = null; W.peek = false;
+  if (!SR) {
+    let ok = false;
+    try { ok = await startRecorder(); } catch { say('Trang chưa được dùng micro. Cho phép micro rồi bấm Nói lại.', true); return; }
+    if (!ok) { say('Trình duyệt này không thu âm được. Hãy dùng Chrome.'); return; }
+    setBack(null);
+    Object.assign(W, { active: true, done: false, t0: performance.now(), finals: [], cur: '', interim: '', err: null, rec: null, withRec: true });
+    W.timer = setInterval(renderWLive, 500);
+    render(); return;
+  }
+  let withRec = !P.noConcurrent;
+  if (withRec) {
+    try { withRec = await startRecorder(); }
+    catch { say('Trang chưa được dùng micro. Cho phép micro trong cài đặt trình duyệt rồi bấm Nói lại.', true); return; }
+    if (withRec) setBack(null);
+  }
+  W.token++;
+  Object.assign(W, { active: true, done: false, t0: performance.now(), finals: [], cur: '', interim: '', err: null, rec: null, withRec, retried: false });
+  W.timer = setInterval(renderWLive, 500);
+  wholeSession(W.token);
+  render();
+}
+function wholeSession(tok) {
+  let r;
+  try { r = new SR(); } catch { W.err = 'start'; finishWhole(); return; }
+  W.rec = r;
+  r.lang = 'en-US'; r.interimResults = true; r.maxAlternatives = 1;
+  r.continuous = !IS_ANDROID;            // Android ngắt sau mỗi câu, trang tự mở lại
+  const fin = [];
+  r.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) fin[i] = e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    const before = W.cur;
+    W.cur = fin.filter(Boolean).join(' '); W.interim = interim;
+    if (W.cur !== before) { W.live = evaluateWhole(heardSoFar()).marks; renderWhole(); }
+    renderWLive();
+  };
+  r.onerror = e => { if (FATAL.includes(e.error)) W.err = e.error; };
+  r.onend = async () => {
+    if (tok !== W.token) return;           // đã hủy
+    const said = fin.filter(Boolean).join(' ').trim();
+    if (said) W.finals.push(said);
+    W.cur = ''; W.interim = '';
+    if (W.err === 'audio-capture' && W.withRec && !W.retried) {
+      W.retried = true; W.err = null; W.withRec = false;
+      await stopRecorder(false);
+      P.noConcurrent = true; savePrefs(); renderSelf();
+    }
+    if (W.active && !W.err && performance.now() - W.t0 < 10 * 60000) { wholeSession(tok); return; }
+    finishWhole();
+  };
+  try { r.start(); } catch { W.err = 'start'; finishWhole(); }
+}
+function stopWhole() {
+  W.active = false;
+  if (W.rec) { try { W.rec.stop(); } catch { finishWhole(); } }
+  else finishWhole();
+}
+function abortWhole() {
+  if (!W.active && !W.rec) return;
+  W.token++; W.active = false; W.done = true;
+  clearInterval(W.timer); W.timer = null;
+  if (W.rec) { try { W.rec.abort(); } catch {} W.rec = null; }
+}
+async function finishWhole() {
+  if (W.done) return;
+  W.done = true; W.active = false; W.rec = null;
+  clearInterval(W.timer); W.timer = null;
+  const secs = (performance.now() - W.t0) / 1000;
+  const blob = await stopRecorder(true);
+  const heard = heardSoFar();
+  $('wLive').textContent = '';
+  if (blob) {
+    if (SR && heard && mrPeak < 0.01) { P.silent = (P.silent || 0) + 1; if (P.silent >= 2) P.noConcurrent = true; savePrefs(); }
+    else setBack(blob);
+  }
+  if (!SR) { W.peek = true; render(); return; }
+  if (!heard) {
+    const m = {
+      'not-allowed': 'Trang chưa được dùng micro. Cho phép micro trong cài đặt trình duyệt rồi bấm Nói lại.',
+      'service-not-allowed': 'Trình duyệt chặn phần nhận giọng nói. Hãy dùng Chrome.',
+      'network': 'Phần nhận giọng nói cần mạng. Kiểm tra kết nối rồi thử lại.',
+      'audio-capture': 'Không mở được micro. Kiểm tra micro rồi thử lại.',
+      'language-not-supported': 'Máy này chưa nhận được giọng tiếng Anh.'
+    }[W.err];
+    say(m || 'Chưa nghe thấy gì. Bấm Nói cả bài rồi đọc to, rõ hơn.', !!m);
+    W.live = null; render(); return;
+  }
+  const r = evaluateWhole(heard);
+  r.secs = secs;
+  r.wpm = secs > 3 ? Math.round(normWords(heard).length / (secs / 60)) : 0;
+  W.result = r; W.live = null;
+  L.whole = (L.whole || []).concat({ ts: Date.now(), score: Math.floor(r.score * 1000) / 1000, secs: Math.round(secs), wpm: r.wpm, level: P.level }).slice(-20);
+  putLesson(L);
+  render();
+  const box = $('wResult');
+  if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' });
+}
+function renderWLive() {
+  if (!W.active) return;
+  const secs = (performance.now() - W.t0) / 1000;
+  const words = (heardSoFar() + ' ' + W.interim).trim().split(/\s+/).filter(Boolean);
+  const tail = words.slice(-14).join(' ');
+  $('wLive').textContent = fmtTime(secs) + (SR ? (tail ? '  …' + tail : '  Đang nghe, bạn đọc đi.') : '  Đang thu. Đọc xong bấm Xong.');
+}
+function fmtTime(secs) {
+  secs = Math.round(secs);
+  return Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+}
+function fmtLen(secs) {
+  secs = Math.round(secs);
+  const m = Math.floor(secs / 60), s2 = secs % 60;
+  return m ? m + ' phút' + (s2 ? ' ' + String(s2).padStart(2, '0') + ' giây' : '') : s2 + ' giây';
+}
+function drill(indices) {
+  queue = indices.slice().sort((a, b) => a - b);
+  P.mode = 0; savePrefs();
+  go(queue[0]);
+  window.scrollTo(0, 0);
+}
+function nextIndex(dir) {
+  if (!queue) return idx + dir;
+  const qi = queue.indexOf(idx);
+  if (qi >= 0) return queue[qi + dir] != null ? queue[qi + dir] : idx;
+  const c = dir > 0 ? queue.find(i => i > idx) : [...queue].reverse().find(i => i < idx);
+  return c != null ? c : idx;
+}
+
 function finish(r) {
   result = r;
   $('live').textContent = '';
@@ -800,7 +1064,8 @@ function finish(r) {
   putLesson(L);
   render();
   if (r.score >= PASS && P.autoNext) {
-    if (idx < L.items.length - 1) nextTimer = setTimeout(() => go(idx + 1), 1800);
+    const n = nextIndex(1);
+    if (n !== idx && n < L.items.length) nextTimer = setTimeout(() => go(n), 1800);
   }
 }
 
@@ -876,22 +1141,94 @@ function renderDots() {
     b.classList.toggle('ok', s >= PASS);
     b.classList.toggle('try', s != null && s < PASS);
     b.setAttribute('aria-current', String(i === idx));
+    b.classList.toggle('q', !!queue && queue.includes(i));
   });
 }
 function renderDock() {
-  $('listenText').textContent = speaking || looping ? 'Dừng' : 'Nghe';
-  $('speak').setAttribute('aria-pressed', String(listening));
-  $('speakText').textContent = listening ? 'Xong' : 'Nói';
-  if (L) { $('prev').disabled = idx === 0; $('next').disabled = idx >= L.items.length - 1; }
+  const whole = P.mode === 1;
+  const playingNow = speaking || looping || wPlaying;
+  $('listenText').textContent = playingNow ? 'Dừng' : (whole ? 'Nghe cả bài' : 'Nghe');
+  const on = whole ? W.active : listening;
+  $('speak').setAttribute('aria-pressed', String(on));
+  $('speakText').textContent = on ? 'Xong' : (whole ? 'Nói cả bài' : 'Nói');
+  $('prev').hidden = whole; $('next').hidden = whole;
+  $('dockIn').classList.toggle('two', whole);
+  if (L && !whole) { $('prev').disabled = nextIndex(-1) === idx || idx === 0; $('next').disabled = nextIndex(1) === idx || idx >= L.items.length - 1; }
+}
+function renderWhole() {
+  const box = $('whole');
+  const res = W.result;
+  const revealed = P.level === 0 || W.peek || !!res;
+  box.textContent = '';
+  box.classList.toggle('stack', P.showVi);
+  L.items.forEach((it, si) => {
+    const sEl = document.createElement('span');
+    sEl.className = 's'; sEl.dataset.i = si;
+    if (si === playIdx) sEl.classList.add('now');
+    tokens(it.en).forEach((t, k) => {
+      if (k) sEl.append(' ');
+      const w = document.createElement('span');
+      w.className = 'w'; w.dataset.s = t.start; w.dataset.e = t.end;
+      if (revealed) w.textContent = t.text; else maskInto(w, t.text, P.level === 1);
+      const mk = res ? res.marks[si][k] : (W.live ? W.live[si][k] : null);
+      if (mk === true && (res || W.live)) w.classList.add('ok');
+      if (mk === false && res) w.classList.add('miss');
+      sEl.append(w);
+    });
+    if (P.showVi && it.vi) { const v = document.createElement('span'); v.className = 'svi'; v.lang = 'vi'; v.textContent = it.vi; sEl.append(v); }
+    box.append(sEl);
+    if (!P.showVi) box.append(' ');
+  });
+  $('wPeek').hidden = revealed;
+}
+function renderWResult() {
+  const box = $('wResult'), r = W.result;
+  if (!r) { box.hidden = true; return; }
+  box.hidden = false;
+  const pass = r.score >= 0.9;
+  box.classList.toggle('pass', pass); box.classList.toggle('fail', !pass);
+  const pct = Math.round(r.score * 100);
+  $('wBadge').textContent = 'Đúng ' + r.hits + '/' + r.total + ' từ (' + pct + '%).' + (pass ? ' Tốt lắm.' : '');
+  let stats = 'Thời gian ' + fmtLen(r.secs) + '.';
+  if (r.wpm) {
+    stats += ' Bạn đọc khoảng ' + r.wpm + ' từ/phút';
+    const model = L.pace && L.pace[P.rate];
+    stats += model ? ', giọng mẫu ' + model + ' từ/phút.' : '. Người bản xứ nói chuyện thường khoảng 130 đến 150 từ/phút.';
+  }
+  $('wStats').textContent = stats;
+  const weak = r.per.map((p, i) => ({ i, p, sc: p.total ? p.hits / p.total : 1 })).filter(x => x.sc < PASS).sort((a, b) => a.sc - b.sc);
+  $('wWeak').hidden = !weak.length;
+  const ol = $('wWeakList'); ol.textContent = '';
+  for (const x of weak) {
+    const li = document.createElement('li');
+    li.append('Câu ' + (x.i + 1) + ': ' + L.items[x.i].en + ' ');
+    const sp = document.createElement('span'); sp.textContent = '(' + x.p.hits + '/' + x.p.total + ' từ)';
+    li.append(sp); ol.append(li);
+  }
+  $('wDrill').dataset.ids = weak.map(x => x.i).join(',');
+  $('wHeard').textContent = '“' + r.heard + '”';
+}
+function renderWLast() {
+  const h = L.whole && L.whole[L.whole.length - 1];
+  $('wLast').textContent = h
+    ? 'Lần nói cả bài gần nhất: đúng ' + Math.round(h.score * 100) + '%, ' + fmtLen(h.secs) + '.'
+    : 'Chưa nói cả bài lần nào. Nghe vài lượt trước rồi hãy thử.';
 }
 function render() {
   if (!L) return;
   $('pTitle').textContent = L.title || 'Bài không tên';
-  $('pos').textContent = 'Câu ' + (idx + 1) + ' / ' + L.items.length;
+  $('practice').dataset.mode = P.mode;
+  setSeg('mode', P.mode);
+  let pos = 'Câu ' + (idx + 1) + ' / ' + L.items.length;
+  if (queue) { const qi = queue.indexOf(idx); pos += qi >= 0 ? '. Luyện lại câu yếu ' + (qi + 1) + '/' + queue.length : '. Đang luyện lại ' + queue.length + ' câu yếu'; }
+  $('pos').textContent = pos;
+  $('clearQueue').hidden = !queue;
   setSeg('level', P.level); setSeg('viMode', P.showVi ? 1 : 0); setSeg('rate', P.rate);
   $('autoMic').checked = P.autoMic; $('autoNext').checked = P.autoNext; $('loopListen').checked = P.loopListen;
   $('autoMic').disabled = P.loopListen;
-  renderSentence(); renderResult(); renderDots(); renderDock(); renderSelf();
+  if (P.mode === 1) { renderWhole(); renderWResult(); renderWLast(); }
+  else { renderSentence(); renderResult(); renderDots(); }
+  renderDock(); renderSelf();
 }
 
 function renderList() {
@@ -906,7 +1243,8 @@ function renderList() {
     const t = document.createElement('span'); t.className = 'lesson-t'; t.textContent = l.title || 'Bài không tên';
     const ok = l.items.filter((_, i) => (l.best && l.best[i] || 0) >= PASS).length;
     const m = document.createElement('span'); m.className = 'lesson-m';
-    m.textContent = l.items.length + ' câu, đã đạt ' + ok + (l.titleVi ? '. ' + l.titleVi : '');
+    const lw = l.whole && l.whole[l.whole.length - 1];
+    m.textContent = l.items.length + ' câu, đã đạt ' + ok + (lw ? ', cả bài ' + Math.round(lw.score * 100) + '%' : '') + (l.titleVi ? '. ' + l.titleVi : '');
     const meter = document.createElement('span'); meter.className = 'meter';
     const bar = document.createElement('i'); bar.style.width = (l.items.length ? ok / l.items.length * 100 : 0) + '%';
     meter.append(bar);
@@ -923,8 +1261,10 @@ function stopAll() {
   stopSpeaking();
   listenToken++;
   if (rec) { try { rec.abort(); } catch {} rec = null; }
+  abortWhole();
   if (mr) stopRecorder(false);
   listening = false; selfRec = false;
+  $('wLive').textContent = '';
   audio.pause();
 }
 function go(i) {
@@ -950,6 +1290,7 @@ function route() {
     const l = lessons().find(x => x.id === h.slice(4));
     if (l) {
       L = l; L.best = L.best || {};
+      queue = null; W.result = null; W.live = null; W.peek = false;
       show('practice');
       go(Math.min(L.last || 0, L.items.length - 1));
       return;
@@ -1012,17 +1353,34 @@ $('copyPrompt').addEventListener('click', async () => {
 /* ---------- sự kiện màn luyện ---------- */
 $('listen').addEventListener('click', () => {
   if (!L) return;
-  if (speaking || looping) { stopSpeaking(); renderDock(); return; }
+  if (speaking || looping || wPlaying) { stopSpeaking(); renderDock(); return; }
+  if (P.mode === 1) { playWhole(0); return; }
   if (listening) stopAll();
   clearTimeout(nextTimer);
   looping = P.loopListen;
   playModel();
 });
-$('speak').addEventListener('click', toggleSpeak);
-$('prev').addEventListener('click', () => go(idx - 1));
-$('next').addEventListener('click', () => go(idx + 1));
+$('speak').addEventListener('click', () => (P.mode === 1 ? toggleWhole() : toggleSpeak()));
+$('prev').addEventListener('click', () => go(nextIndex(-1)));
+$('next').addEventListener('click', () => go(nextIndex(1)));
+$('mode').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || +b.dataset.v === P.mode) return;
+  stopAll(); setBack(null); say('');
+  P.mode = +b.dataset.v; savePrefs();
+  render();
+});
+$('whole').addEventListener('click', e => {
+  const s2 = e.target.closest('.s'); if (!s2 || W.active) return;
+  playWhole(+s2.dataset.i);
+});
+$('wPeek').addEventListener('click', () => { W.peek = true; render(); });
+$('wDrill').addEventListener('click', () => {
+  const ids = ($('wDrill').dataset.ids || '').split(',').filter(Boolean).map(Number);
+  if (ids.length) drill(ids);
+});
+$('clearQueue').addEventListener('click', () => { queue = null; render(); });
 $('dots').addEventListener('click', e => { const b = e.target.closest('.dot'); if (b) go(+b.dataset.i); });
-$('level').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; P.level = +b.dataset.v; peek = false; savePrefs(); render(); });
+$('level').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; P.level = +b.dataset.v; peek = false; W.peek = false; savePrefs(); render(); });
 $('viMode').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; P.showVi = b.dataset.v === '1'; viOne = false; savePrefs(); render(); });
 $('rate').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; P.rate = +b.dataset.v; savePrefs(); render(); });
 $('peek').addEventListener('click', () => { peek = true; render(); });
@@ -1063,13 +1421,14 @@ document.addEventListener('keydown', e => {
   if (t.closest && t.closest('input, textarea, select, summary')) return;
   const onButton = t.closest && t.closest('button');
   switch (e.key) {
-    case ' ': if (onButton) return; e.preventDefault(); toggleSpeak(); break;
+    case ' ': if (onButton) return; e.preventDefault(); $('speak').click(); break;
+    case 'w': case 'W': $('mode').querySelector('[data-v="' + (P.mode ? 0 : 1) + '"]').click(); break;
     case 'l': case 'L': $('listen').click(); break;
     case 'r': case 'R': if (!$('recOnly').hidden) toggleSelfRec(); break;
-    case 'ArrowLeft': e.preventDefault(); go(idx - 1); break;
-    case 'ArrowRight': e.preventDefault(); go(idx + 1); break;
+    case 'ArrowLeft': if (P.mode === 1) return; e.preventDefault(); go(nextIndex(-1)); break;
+    case 'ArrowRight': if (P.mode === 1) return; e.preventDefault(); go(nextIndex(1)); break;
     case 'd': case 'D': P.showVi = !P.showVi; savePrefs(); render(); break;
-    case 'h': case 'H': P.level = (P.level + 1) % 3; peek = false; savePrefs(); render(); break;
+    case 'h': case 'H': P.level = (P.level + 1) % 3; peek = false; W.peek = false; savePrefs(); render(); break;
   }
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopAll(), renderDock(); });
