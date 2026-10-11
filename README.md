@@ -19,6 +19,7 @@ Luyện nói theo một bài có chữ, ví dụ ảnh chụp một bài đăng.
    - Từng câu: Nghe để máy đọc mẫu (lặp đến khi bấm Dừng), Nói để đọc to. Từ nói trúng hiện xanh, từ thiếu hoặc sai hiện đỏ.
    - Cả bài: Nghe cả bài để máy đọc liền từ đầu (bấm vào một câu để nghe từ câu đó). Nói cả bài để đọc liền một mạch; xong bài, trang tô xanh đỏ, báo thời gian, tốc độ đọc và các câu còn yếu.
 4. Đổi "Chữ trên thẻ" sang Chữ đầu hoặc Che hết khi đã quen. Phần dịch mặc định ẩn.
+5. Sau khi thu âm, bấm **Nhờ Gemini nhận xét**. Trên điện thoại, chọn app Gemini trong bảng chia sẻ: file ghi âm (WAV) và câu lệnh được gửi kèm. Trên máy tính, trang tải file về, chép sẵn câu lệnh và mở Gemini; bạn đính kèm file, dán câu lệnh rồi gửi. Gemini sẽ nhận xét phát âm, trọng âm, ngữ điệu và chấm điểm bằng tiếng Việt.
 
 ### Cách luyện một bài cho hiệu quả
 

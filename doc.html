@@ -172,6 +172,10 @@ textarea { min-height: 180px; resize: vertical; line-height: 1.5; }
 .result.fail .badge { color: var(--bad); }
 .heard { color: var(--muted); font-size: var(--t-xs); overflow-wrap: anywhere; min-width: 0; flex: 1 1 200px; }
 .self { display: grid; gap: 8px; }
+.ai { display: grid; gap: 8px; padding: 12px 14px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); font-size: var(--t-xs); }
+.ai details summary { cursor: pointer; color: var(--muted); font-weight: 500; }
+.ai details[open] summary { margin-bottom: 8px; }
+.ai .prompt { max-height: 240px; overflow: auto; margin-bottom: 8px; }
 .btn.rec { border-color: var(--rec); color: var(--rec); font-weight: 600; }
 .btn.rec .dot { width: 12px; height: 12px; border-radius: 50%; background: currentColor; }
 .btn.rec[aria-pressed="true"] { background: var(--rec); color: var(--on-rec); }
@@ -351,6 +355,15 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
       <div class="row">
         <button class="btn rec" type="button" id="recOnly" aria-pressed="false" hidden><span class="dot" aria-hidden="true"></span><span id="recOnlyText">Thu âm</span></button>
         <button class="btn" type="button" id="playBack" hidden>Nghe lại giọng mình</button>
+        <button class="btn" type="button" id="askAi" hidden>Nhờ Gemini nhận xét</button>
+      </div>
+      <div class="ai" id="aiBox" hidden>
+        <p id="aiHint"></p>
+        <details>
+          <summary>Câu lệnh gửi kèm</summary>
+          <pre class="prompt" id="aiPrompt"></pre>
+          <div class="row"><button class="btn small" type="button" id="aiCopy">Chép câu lệnh</button><a class="btn small" id="aiOpen" href="https://gemini.google.com/app" target="_blank" rel="noopener">Mở Gemini</a></div>
+        </details>
       </div>
       <p class="hint" id="recHint" hidden>Trên điện thoại này, nút Nói chỉ dùng để chấm. Muốn nghe lại giọng mình, bấm Thu âm, đọc rồi bấm Dừng thu.</p>
     </div>
@@ -784,8 +797,110 @@ function stopRecorder(keep) {
 function setBack(blob) {
   if (backUrl) { URL.revokeObjectURL(backUrl); backUrl = null; }
   audio.removeAttribute('src');
-  if (blob) { backUrl = URL.createObjectURL(blob); audio.src = backUrl; }
+  backBlob = blob || null; wavReady = null; wavJob++;
+  $('aiBox').hidden = true;
+  if (blob) {
+    backUrl = URL.createObjectURL(blob); audio.src = backUrl;
+    const job = wavJob;
+    toWav(blob).then(w => { if (job === wavJob) wavReady = w; }).catch(() => { if (job === wavJob) wavReady = blob; });
+  }
   renderSelf();
+}
+
+/* ---------- gửi Gemini nhận xét ---------- */
+let backBlob = null, wavReady = null, wavJob = 0;
+// Đổi bản thu (webm/mp4) sang WAV 16 kHz một kênh: định dạng Gemini nhận chắc chắn.
+async function toWav(blob) {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const OCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!Ctx || !OCtx) throw new Error('no audio');
+  const ctx = new Ctx();
+  let buf;
+  try { buf = await ctx.decodeAudioData(await blob.arrayBuffer()); } finally { ctx.close().catch(() => {}); }
+  const rate = 16000, len = Math.max(1, Math.ceil(buf.duration * rate));
+  const off = new OCtx(1, len, rate);
+  const src = off.createBufferSource(); src.buffer = buf; src.connect(off.destination); src.start();
+  const pcm = (await off.startRendering()).getChannelData(0);
+  const out = new DataView(new ArrayBuffer(44 + pcm.length * 2));
+  const str = (o, t) => { for (let i = 0; i < t.length; i++) out.setUint8(o + i, t.charCodeAt(i)); };
+  str(0, 'RIFF'); out.setUint32(4, 36 + pcm.length * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+  out.setUint32(24, rate, true); out.setUint32(28, rate * 2, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true);
+  str(36, 'data'); out.setUint32(40, pcm.length * 2, true);
+  for (let i = 0; i < pcm.length; i++) out.setInt16(44 + i * 2, Math.max(-1, Math.min(1, pcm[i])) * 0x7fff, true);
+  return new Blob([out], { type: 'audio/wav' });
+}
+function aiPrompt() {
+  const lines = ['Tôi là người Việt đang luyện nói tiếng Anh.'];
+  if (P.mode === 1) {
+    lines.push('File âm thanh đính kèm là tôi đọc cả bài sau:', '', L.items.map(it => it.en).join(' '), '');
+    const r = W.result;
+    if (r) {
+      lines.push('Máy nhận giọng của trình duyệt chấm lần đọc gần nhất: đúng ' + r.hits + '/' + r.total + ' từ, đọc trong ' + fmtLen(r.secs) + (r.wpm ? ', khoảng ' + r.wpm + ' từ/phút' : '') + '.');
+      const weak = r.per.map((p2, i) => ({ i, sc: p2.total ? p2.hits / p2.total : 1 })).filter(x => x.sc < PASS).map(x => L.items[x.i].en);
+      if (weak.length) lines.push('Các câu máy nhận ra kém: ' + weak.map(w => '"' + w + '"').join('; ') + '.');
+      lines.push('');
+    }
+  } else {
+    lines.push('File âm thanh đính kèm là tôi đọc câu sau:', '', '"' + cur().en + '"', '');
+    if (result) {
+      lines.push('Máy nhận giọng của trình duyệt nghe được: "' + result.heard + '".');
+      const missed = tokens(cur().en).filter((t, k) => result.marks[k] === false).map(t => t.text.replace(/[^\p{L}\p{N}'-]/gu, ''));
+      if (missed.length) lines.push('Các từ máy không nhận ra: ' + missed.join(', ') + '.');
+      lines.push('');
+    }
+  }
+  lines.push(
+    'Hãy nghe file và nhận xét bằng tiếng Việt, ngắn gọn:',
+    '1. Tối đa 3 lỗi phát âm chính: từ nào, tôi đang đọc sai ra sao, phiên âm IPA đúng, và mẹo đặt lưỡi, môi dễ hiểu với người Việt.',
+    '2. Trọng âm, ngữ điệu và nối âm: chỗ nào cần sửa.',
+    '3. Chấm điểm phát âm trên thang 10.',
+    '4. Một việc tôi nên tập lại trước tiên.',
+    'Nếu file không nghe rõ hoặc không phải đoạn trên thì nói thẳng, đừng đoán.'
+  );
+  return lines.join('\n');
+}
+function aiFileName(ext) {
+  const slug = (L.title || 'bai').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'bai';
+  return 'shadowing-' + slug + (P.mode === 1 ? '-ca-bai' : '-cau-' + (idx + 1)) + '.' + ext;
+}
+function copyText(t) {
+  if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(() => true, () => false);
+  return Promise.resolve(false);
+}
+function showAi(hint, prompt) {
+  $('aiHint').textContent = hint;
+  $('aiPrompt').textContent = prompt;
+  $('aiBox').hidden = false;
+}
+async function askGemini() {
+  if (!backBlob) return;
+  if (!wavReady) { say('Đang chuẩn bị file ghi âm, bấm lại sau một giây.'); return; }
+  const prompt = aiPrompt();
+  const isWav = wavReady.type === 'audio/wav';
+  const ext = isWav ? 'wav' : ((wavReady.type.split('/')[1] || 'webm').split(';')[0]);
+  const file = new File([wavReady], aiFileName(ext), { type: isWav ? 'audio/wav' : wavReady.type });
+  const copied = copyText(prompt);               // chép trước, phòng khi Gemini chỉ nhận file
+  stopSpeaking(); audio.pause();
+  if (navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], text: prompt, title: 'Nhận xét phát âm' });
+      const ok = await copied;
+      showAi('Đã gửi sang ứng dụng bạn chọn. Nếu Gemini chỉ nhận file mà không có chữ, ' + (ok ? 'câu lệnh đã được chép sẵn, bạn dán vào ô chat.' : 'mở mục bên dưới để chép câu lệnh.'), prompt);
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') { showAi('Chưa gửi. Bấm lại khi muốn gửi, hoặc mở mục bên dưới để tự gửi.', prompt); return; }
+      // chia sẻ lỗi: chuyển sang cách tải file
+    }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file); a.download = file.name;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  const ok = await copied;
+  window.open('https://gemini.google.com/app', '_blank', 'noopener');
+  showAi('Đã tải file ' + file.name + (ok ? ' và chép câu lệnh.' : '.') + ' Trong Gemini, bấm dấu + để đính kèm file vừa tải, ' + (ok ? 'dán câu lệnh' : 'chép câu lệnh ở mục bên dưới') + ' rồi gửi.', prompt);
 }
 function renderSelf() {
   const separate = !!SR && P.noConcurrent;
@@ -793,6 +908,7 @@ function renderSelf() {
   $('recOnly').setAttribute('aria-pressed', String(selfRec));
   $('recOnlyText').textContent = selfRec ? 'Dừng thu' : 'Thu âm';
   $('playBack').hidden = !backUrl || selfRec;
+  $('askAi').hidden = !backUrl || selfRec;
 }
 async function toggleSelfRec() {
   if (selfRec) {
@@ -1394,6 +1510,12 @@ $('loopListen').addEventListener('change', e => {
 $('autoNext').addEventListener('change', e => { P.autoNext = e.target.checked; savePrefs(); if (!P.autoNext) clearTimeout(nextTimer); renderResult(); });
 $('voice').addEventListener('change', e => { P.voice = e.target.value; savePrefs(); });
 $('recOnly').addEventListener('click', toggleSelfRec);
+$('askAi').addEventListener('click', askGemini);
+$('aiCopy').addEventListener('click', async () => {
+  const ok = await copyText($('aiPrompt').textContent);
+  $('aiCopy').textContent = ok ? 'Đã chép' : 'Bấm giữ vào câu lệnh để chép';
+  setTimeout(() => { $('aiCopy').textContent = 'Chép câu lệnh'; }, 2500);
+});
 $('playBack').addEventListener('click', () => {
   if (!backUrl) return;
   clearTimeout(nextTimer); stopSpeaking();
