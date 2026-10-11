@@ -454,7 +454,8 @@ const PREF = 'speak.prefs.v2';
 const IS_ANDROID = /Android/i.test(navigator.userAgent);
 const PASS = 0.85;
 const PASS_KID = 0.7;              // bài trẻ em: dễ qua hơn
-const KID_TRIES = 3;               // đọc 3 lần chưa qua vẫn cho qua
+const KID_TRIES = 10;              // từ lần thứ 10, đúng trên 50% thì cho qua
+const KID_SLOW_AT = 5;             // sau 5 lần chưa qua: động viên và đọc mẫu chậm lại
 // Từ ngắn máy hay nghe sót ở giọng trẻ em: không tính trượt
 const STOP = new Set(['a', 'an', 'the', 'to', 'of', 'is', 'am', 'are', 'and', 'in', 'on', 'at']);
 
@@ -1039,7 +1040,7 @@ function speakText(text, onEnd) {
   const u = new SpeechSynthesisUtterance(text);
   const v = pickVoice();
   if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'en-US';
-  u.rate = P.rate;
+  u.rate = slowIdx === idx && P.mode === 0 ? Math.min(P.rate, 0.7) : P.rate;   // câu khó của bé: đọc chậm
   u.onboundary = e => { if (my === sayToken && (!e.name || e.name === 'word')) markSpeaking(e.charIndex); };
   const done = ok => {
     if (my !== sayToken) return;
@@ -1559,7 +1560,7 @@ function nextIndex(dir) {
 
 const isKid = () => !!L && groupOf(L) === 1;
 const passFor = l => (l && groupOf(l) === 1 ? PASS_KID : PASS);
-let tries = 0;
+let tries = 0, sessBestHits = -1, slowIdx = -1;   // tính trong phiên, rời câu là đếm lại
 const CHEERS = ['Giỏi quá!', 'Tuyệt vời!', 'Siêu quá!', 'Hay lắm!', 'Xuất sắc!', 'Đỉnh quá!'];
 function celebrate(box) {
   try {
@@ -1591,7 +1592,13 @@ function finish(r) {
   result = r;
   $('live').textContent = '';
   const need = passFor(L);
-  if (isKid() && r.score < need) { tries++; if (tries >= KID_TRIES) r.forced = true; }
+  if (isKid() && r.score < need) {
+    tries++;
+    if (sessBestHits >= 0 && r.hits > sessBestHits) r.better = r.hits - sessBestHits;
+    if (tries >= KID_TRIES && r.score > 0.5) r.forced = true;
+    if (tries >= KID_SLOW_AT) slowIdx = idx;
+  }
+  if (isKid()) sessBestHits = Math.max(sessBestHits, r.hits);
   if (isKid()) r.cheer = CHEERS[Math.floor(Math.random() * CHEERS.length)];
   const passed = r.score >= need || r.forced;
   const wasDone = inSeq(L) && isDone(L);
@@ -1654,9 +1661,11 @@ function renderResult() {
     const last = idx === L.items.length - 1;
     let label;
     if (isKid()) {
-      if (result.forced && result.score < need) label = 'Bé cố gắng lắm rồi! Mình sang câu sau nhé.';
+      if (result.forced && result.score < need) label = 'Bé cố gắng lắm rồi! Câu này qua nhé, mình sang câu sau.';
       else if (passed) label = (result.cheer || 'Giỏi quá!') + ' Đúng ' + result.hits + '/' + result.total + ' từ.';
-      else label = 'Gần đúng rồi! Nghe mẫu rồi nói lại nhé.' + (tries === KID_TRIES - 1 ? ' Thử thêm 1 lần nữa thôi.' : '');
+      else if (result.better) label = 'Tiến bộ rồi! Lần này đúng ' + result.hits + '/' + result.total + ' từ, hơn lần trước ' + result.better + ' từ.';
+      else if (tries >= KID_SLOW_AT) label = 'Câu này khó đấy, bé giỏi lắm vì không bỏ cuộc! Bấm Nghe để nghe chậm lại rồi thử nhé.';
+      else label = 'Gần đúng rồi! Nghe mẫu rồi nói lại nhé.';
       if (passed && last) label += ' Xong cả bài rồi, giỏi quá!';
     } else {
       label = 'Đúng ' + result.hits + '/' + result.total + ' từ.';
@@ -1910,7 +1919,7 @@ function go(i) {
   if (!L) return;
   stopAll();
   idx = Math.max(0, Math.min(L.items.length - 1, i));
-  peek = false; viOne = false; result = null; selfCheck = false; tries = 0;
+  peek = false; viOne = false; result = null; selfCheck = false; tries = 0; sessBestHits = -1; slowIdx = -1;
   setBack(null); $('live').textContent = ''; say('');
   L.last = idx; putLesson(L);
   render();
