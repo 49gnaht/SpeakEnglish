@@ -240,6 +240,14 @@ select.field { height: 44px; padding: 0 10px; }
 .guide h2 { font-size: var(--t-md); font-weight: 700; }
 .guide .steps > li { font-size: var(--t-sm); }
 .guide .steps span { color: var(--muted); display: block; font-size: var(--t-xs); }
+.lesson.locked { opacity: 0.55; cursor: default; }
+.tag.done { border-color: var(--good); color: var(--good); }
+.tag.next { border-color: var(--accent); color: var(--accent); }
+.gate { display: grid; gap: 10px; padding: 12px 14px; border-radius: var(--r); border: 1px solid var(--accent); background: var(--surface); }
+.gate.won { border-color: var(--good); background: var(--good-bg); }
+.gate p { margin: 0; font-weight: 500; }
+.list li .lock-note { grid-column: 1 / -1; }
+.lock-note { font-size: var(--t-xs); color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .keys { font-size: var(--t-xs); color: var(--muted); }
 .keys kbd { font: inherit; font-weight: 600; color: var(--ink); padding: 0 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
 @media (hover: none) { .keys { display: none; } }
@@ -264,6 +272,8 @@ select.field { height: 44px; padding: 0 10px; }
       <button type="button" data-v="0">Người lớn</button>
       <button type="button" data-v="1">Trẻ em</button>
     </div>
+    <label class="check" id="orderOpt" hidden><input type="checkbox" id="adultOrder"> Học bài mẫu theo thứ tự (qua bài trước mới mở bài sau)</label>
+    <p class="hint" id="kidRule" hidden>Bài mẫu trẻ em mở lần lượt: đọc đạt hết các câu và nói cả bài đạt 70% thì mở bài tiếp theo. Mỗi ngày học tối đa 4 bài mới.</p>
     <ul class="list" id="lessonList"></ul>
     <p class="hint" id="noLessons" hidden></p>
     <section class="guide" aria-labelledby="guideHead">
@@ -345,6 +355,7 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
       </div>
     </div>
 
+    <div class="gate" id="gate" hidden></div>
     <article class="card only-s">
       <p class="sent" id="sent" lang="en"></p>
       <p class="vi" id="vi" hidden></p>
@@ -801,6 +812,11 @@ const SAMPLES = [SAMPLE, SAMPLE_HOBBY, SAMPLE_TOY, SAMPLE_TEACHER, SAMPLE_RICE, 
   SAMPLE_HARDWORK, SAMPLE_NOPAIN, SAMPLE_WILLPOWER, SAMPLE_BETTER, SAMPLE_BALANCE,
   SAMPLE_EXPERIMENT, SAMPLE_TRANSFORM, SAMPLE_PRIORITIES, SAMPLE_HABITS, SAMPLE_ROUTINE];
 const groupOf = l => (l.group === 1 ? 1 : 0);   // bài cũ chưa có nhóm: Người lớn
+// Thứ tự học bài mẫu trẻ em: từ dễ đến khó
+const KID_ORDER = ['mau-sunny-day', 'mau-bedtime-story', 'mau-my-favorite-toy', 'mau-my-friday', 'mau-sorry-mom',
+  'mau-english-test', 'mau-my-favorite-hobby', 'mau-doraemon', 'mau-rice', 'mau-teachers-day'];
+const ADULT_ORDER = SAMPLES.filter(x => x.group === 0).map(x => x.id);
+const DAILY_NEW = 4;                 // mỗi ngày tối đa 4 bài mới (bài có thứ tự)
 
 const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: false, autoNext: false, loopListen: true, mode: 0, group: 0, noConcurrent: IS_ANDROID, silent: 0 };
 let L = null, idx = 0;
@@ -1501,12 +1517,15 @@ async function finishWhole() {
   r.secs = secs;
   r.wpm = secs > 3 ? Math.round(normWords(heard).length / (secs / 60)) : 0;
   W.result = r; W.live = null;
+  const wasDone = inSeq(L) && isDone(L);
   L.whole = (L.whole || []).concat({ ts: Date.now(), score: Math.floor(r.score * 1000) / 1000, secs: Math.round(secs), wpm: r.wpm, level: P.level }).slice(-20);
+  if (inSeq(L) && !wasDone && isDone(L)) L.justDone = true;
   putLesson(L);
   render();
   const box = $('wResult');
   if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' });
-  if (isKid() && r.score >= 0.75) celebrate($('whole').closest('.card'));
+  if ((isKid() && r.score >= 0.75) || L.justDone) celebrate($('whole').closest('.card'));
+  if (L.justDone) { const g = $('gate'); if (g.scrollIntoView) g.scrollIntoView({ block: 'nearest' }); }
 }
 function renderWLive() {
   if (!W.active) return;
@@ -1575,12 +1594,14 @@ function finish(r) {
   if (isKid() && r.score < need) { tries++; if (tries >= KID_TRIES) r.forced = true; }
   if (isKid()) r.cheer = CHEERS[Math.floor(Math.random() * CHEERS.length)];
   const passed = r.score >= need || r.forced;
+  const wasDone = inSeq(L) && isDone(L);
   const eff = r.forced ? Math.max(r.score, need) : r.score;
   const best = L.best[idx] || 0;
   if (eff > best) L.best[idx] = Math.floor(eff * 1000) / 1000;
   putLesson(L);
   render();
   if (passed && isKid()) celebrate($('sent').closest('.card'));
+  if (inSeq(L) && !wasDone && isDone(L)) { L.justDone = true; putLesson(L); renderGate(); }
   if (passed && P.autoNext) {
     const n = nextIndex(1);
     if (n !== idx && n < L.items.length) nextTimer = setTimeout(() => go(n), 1800);
@@ -1758,12 +1779,15 @@ function render() {
   $('autoMic').disabled = P.loopListen;
   if (P.mode === 1) { renderWhole(); renderWResult(); renderWLast(); }
   else { renderSentence(); renderResult(); renderDots(); }
-  renderDock(); renderSelf();
+  renderDock(); renderSelf(); renderGate();
 }
 
 function renderList() {
   const everything = lessons(), ul = $('lessonList');
-  const all = everything.filter(l => groupOf(l) === P.group);
+  const all = sortForList(everything.filter(l => groupOf(l) === P.group));
+  $('orderOpt').hidden = P.group !== 0; $('adultOrder').checked = !!P.adultOrder;
+  $('kidRule').hidden = P.group !== 1;
+  let nextMarked = false;
   const counts = [0, 0]; everything.forEach(l => counts[groupOf(l)]++);
   [...$('groupTabs').children].forEach((b, i) => {
     b.textContent = (i ? 'Trẻ em' : 'Người lớn') + ' (' + counts[i] + ')';
@@ -1779,6 +1803,13 @@ function renderList() {
     a.style.textDecoration = 'none';
     const t = document.createElement('span'); t.className = 'lesson-t'; t.textContent = l.title || 'Bài không tên';
     if (l.sample || /^mau-/.test(l.id)) { const tg = document.createElement('span'); tg.className = 'tag'; tg.textContent = 'Bài mẫu'; t.append(tg); }
+    const lock = lockState(l, everything);
+    if (inSeq(l)) {
+      const tg = document.createElement('span'); tg.className = 'tag';
+      if (isDone(l)) { tg.classList.add('done'); tg.textContent = 'Đã qua'; t.append(tg); }
+      else if (!lock && !nextMarked) { tg.classList.add('next'); tg.textContent = 'Học tiếp'; t.append(tg); nextMarked = true; }
+    }
+    if (lock) { a.classList.add('locked'); a.removeAttribute('href'); a.setAttribute('aria-disabled', 'true'); }
     const ok = l.items.filter((_, i) => (l.best && l.best[i] || 0) >= passFor(l)).length;
     const m = document.createElement('span'); m.className = 'lesson-m';
     const lw = l.whole && l.whole[l.whole.length - 1];
@@ -1789,8 +1820,78 @@ function renderList() {
     a.append(t, m, meter);
     const del = document.createElement('button');
     del.type = 'button'; del.className = 'link muted'; del.dataset.del = l.id; del.textContent = 'Xóa';
-    li.append(a, del); ul.append(li);
+    li.append(a, del);
+    if (lock) {
+      const note = document.createElement('div'); note.className = 'lock-note';
+      note.append(lock === 'order' ? 'Qua bài trước để mở bài này.' : 'Hôm nay học đủ ' + dayCap() + ' bài mới rồi, mai học tiếp nhé!');
+      li.append(note);
+    }
+    ul.append(li);
   }
+}
+
+/* ---------- khóa bài theo thứ tự ---------- */
+function today() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+const seqFor = g => (g === 1 ? KID_ORDER : (P.adultOrder ? ADULT_ORDER : null));
+const inSeq = l => { const q = seqFor(groupOf(l)); return !!q && q.includes(l.id); };
+const wholeBest = l => Math.max(0, ...(l.whole || []).map(h => h.score || 0));
+const wholeNeed = l => (groupOf(l) === 1 ? 0.7 : 0.8);
+const sentencesDone = l => l.items.every((_, i) => ((l.best && l.best[i]) || 0) >= passFor(l));
+const isDone = l => sentencesDone(l) && wholeBest(l) >= wholeNeed(l);
+const hasProgress = l => !!l.started || Object.keys(l.best || {}).length > 0 || (l.whole || []).length > 0;
+function dayCap() { return DAILY_NEW; }
+function startedToday(all, g) { return all.filter(x => groupOf(x) === g && inSeq(x) && x.started === today()).length; }
+// null = mở; 'order' = chưa qua bài trước; 'day' = hôm nay đã học đủ bài mới
+function lockState(l, all) {
+  if (!inSeq(l) || isDone(l) || hasProgress(l)) return null;
+  const q = seqFor(groupOf(l));
+  for (let k = q.indexOf(l.id) - 1; k >= 0; k--) {
+    const prev = all.find(x => x.id === q.at(k));
+    if (prev) { if (!isDone(prev)) return 'order'; break; }
+  }
+  return startedToday(all, groupOf(l)) >= dayCap() ? 'day' : null;   // giới hạn tính riêng từng nhóm
+}
+function nextInSeq(l, all) {
+  const q = seqFor(groupOf(l)); if (!q) return null;
+  for (let k = q.indexOf(l.id) + 1; k < q.length; k++) { const n = all.find(x => x.id === q.at(k)); if (n) return n; }
+  return null;
+}
+function sortForList(arr) {
+  const q = seqFor(P.group);
+  if (!q) return arr;
+  const rank = l => (q.includes(l.id) ? q.indexOf(l.id) : 1000);
+  return arr.slice().sort((a, b) => rank(a) - rank(b));
+}
+function renderGate() {
+  const g = $('gate');
+  g.textContent = ''; g.classList.remove('won');
+  if (!L || !inSeq(L)) { g.hidden = true; return; }
+  const all = lessons();
+  const nxt = nextInSeq(L, all);
+  const p = document.createElement('p');
+  if (isDone(L)) {
+    if (!L.justDone) { g.hidden = true; return; }
+    g.classList.add('won');
+    p.textContent = 'Đã qua bài! ' + (nxt ? 'Mở được bài tiếp theo: ' + nxt.title + '.' : 'Bé đã học hết bài mẫu rồi, giỏi quá!');
+    g.append(p);
+    if (nxt) {
+      const b = document.createElement('a'); b.className = 'btn primary small'; b.href = '#bai=' + encodeURIComponent(nxt.id);
+      b.textContent = 'Học bài tiếp'; g.append(b);
+    }
+  } else if (sentencesDone(L)) {
+    const pct = Math.round(wholeNeed(L) * 100);
+    p.textContent = 'Còn một bước nữa: nói cả bài đúng từ ' + pct + '% để mở bài tiếp theo.';
+    g.append(p);
+    if (P.mode !== 1) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn primary small'; b.textContent = 'Nói cả bài';
+      b.addEventListener('click', () => $('mode').querySelector('[data-v="1"]').click());
+      g.append(b);
+    }
+  } else { g.hidden = true; return; }
+  g.hidden = false;
 }
 
 /* ---------- chuyển câu, chuyển màn ---------- */
@@ -1825,9 +1926,19 @@ function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (h === 'moi') { L = null; newGroup = P.group; renderGroupIn(); show('create'); $('paste').focus({ preventScroll: true }); return; }
   if (h.startsWith('bai=')) {
-    const l = lessons().find(x => x.id === h.slice(4));
+    const all = lessons();
+    const l = all.find(x => x.id === h.slice(4));
+    const lock = l && lockState(l, all);
+    if (lock) {
+      if (P.group !== groupOf(l)) { P.group = groupOf(l); savePrefs(); }
+      L = null; renderList(); show('home');
+      say(lock === 'order' ? 'Bài này chưa mở: qua bài trước đã nhé.' : 'Hôm nay học đủ bài mới rồi, mai học tiếp nhé!');
+      try { history.replaceState(null, '', location.pathname); } catch {}
+      return;
+    }
     if (l) {
-      L = l; L.best = L.best || {};
+      if (inSeq(l) && !l.started && !isDone(l)) { l.started = today(); putLesson(l); }
+      L = l; L.best = L.best || {}; L.justDone = false;
       if (P.group !== groupOf(l)) { P.group = groupOf(l); savePrefs(); }   // quay lại danh sách đúng tab
       queue = null; W.result = null; W.live = null; W.peek = false;
       show('practice');
@@ -1870,6 +1981,7 @@ $('titleIn').addEventListener('input', () => { titleTouched = !!$('titleIn').val
 let newGroup = 0;
 function renderGroupIn() { setSeg('groupIn', newGroup); }
 $('groupIn').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { newGroup = +b.dataset.v; renderGroupIn(); } });
+$('adultOrder').addEventListener('change', e => { P.adultOrder = e.target.checked; savePrefs(); renderList(); });
 $('groupTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; P.group = +b.dataset.v; savePrefs(); renderList(); });
 $('saveLesson').addEventListener('click', () => {
   if (!parsed || !parsed.items.length) return;

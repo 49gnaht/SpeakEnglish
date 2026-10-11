@@ -29,6 +29,8 @@ Luyện nói theo một bài có chữ, ví dụ ảnh chụp một bài đăng.
 4. **Luyện lại các câu còn yếu.** Bấm "Luyện các câu này", trang chỉ đưa bạn qua những câu đó.
 5. **Nói cả bài ở mức Chữ đầu, rồi Che hết.** Khi đã đúng trên 90% ở mức trước thì tăng mức. Hôm sau mở lại, nói cả bài trước để xem mình còn nhớ đến đâu.
 
+Bài mẫu trẻ em mở lần lượt từ dễ đến khó: đọc đạt hết các câu và nói cả bài đúng từ 70% thì mở bài tiếp theo, mỗi ngày tối đa 4 bài mới. Bài người lớn không khóa, trừ khi bật "Học bài mẫu theo thứ tự".
+
 Phần chấm lời nói chạy tốt nhất trên Chrome và cần mạng. Trình duyệt khác vẫn thu âm và nghe lại được. Trên Chrome Android, phần nhận giọng tự ngắt khi bạn ngừng nói vài giây; trang tự mở lại, nhưng ngừng quá lâu giữa bài có thể mất vài từ.
 
 Bài và kết quả được lưu trong trình duyệt của từng máy.
