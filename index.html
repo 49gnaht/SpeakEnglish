@@ -247,6 +247,13 @@ select.field { height: 44px; padding: 0 10px; }
 .gate.won { border-color: var(--good); background: var(--good-bg); }
 .gate p { margin: 0; font-weight: 500; }
 .list li .lock-note { grid-column: 1 / -1; }
+.who { justify-self: start; font-size: var(--t-xs); color: var(--muted); text-decoration: none; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+.who b { color: var(--ink); font-weight: 600; }
+.profiles li { grid-template-columns: minmax(0, 1fr) auto auto; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.profiles li.on { border-color: var(--accent); }
+.profiles .pick { text-align: left; background: none; border: 0; padding: 0; font: inherit; font-weight: 600; cursor: pointer; color: var(--ink); overflow-wrap: anywhere; }
+.grow { flex: 1 1 160px; min-width: 0; }
+.acct b { font-size: var(--t-sm, 16px); }
 .lock-note { font-size: var(--t-xs); color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .keys { font-size: var(--t-xs); color: var(--muted); }
 .keys kbd { font: inherit; font-weight: 600; color: var(--ink); padding: 0 5px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
@@ -268,6 +275,7 @@ select.field { height: 44px; padding: 0 10px; }
       <h1>Luyện nói</h1>
       <a class="btn primary" href="#moi">Tạo bài mới</a>
     </div>
+    <a class="who" id="who" href="#hoso"></a>
     <div class="seg groups" id="groupTabs" role="group" aria-label="Nhóm bài">
       <button type="button" data-v="0">Người lớn</button>
       <button type="button" data-v="1">Trẻ em</button>
@@ -289,6 +297,27 @@ select.field { height: 44px; padding: 0 10px; }
   </section>
 
   <!-- tạo bài -->
+  <!-- hồ sơ + đăng nhập -->
+  <section class="view" id="account" hidden>
+    <a class="link muted" href="#">← Bài đã lưu</a>
+    <h1>Ai đang học?</h1>
+    <p class="hint">Mỗi người một hồ sơ riêng: bài đã qua, bài bị khóa và giới hạn 4 bài mới mỗi ngày tính riêng.</p>
+    <ul class="list profiles" id="profileList"></ul>
+    <form class="row" id="addProfile">
+      <input class="field grow" id="profileName" type="text" maxlength="30" autocomplete="off" placeholder="Tên người học, ví dụ: Bé An">
+      <button class="btn" type="submit">Thêm</button>
+    </form>
+    <div class="card acct" id="acct">
+      <b>Lưu lên tài khoản</b>
+      <p class="hint" id="acctText">Đăng nhập Google để giữ tiến độ khi đổi máy và học trên nhiều máy. Không đăng nhập vẫn học bình thường, dữ liệu lưu trên máy này.</p>
+      <div class="row">
+        <button class="btn primary" type="button" id="signIn" hidden>Đăng nhập bằng Google</button>
+        <button class="btn" type="button" id="syncNow" hidden>Đồng bộ ngay</button>
+        <button class="btn" type="button" id="signOut" hidden>Đăng xuất</button>
+      </div>
+    </div>
+  </section>
+
   <section class="view" id="create" hidden>
     <a class="link muted" href="#">← Bài đã lưu</a>
     <h1>Tạo bài mới</h1>
@@ -444,13 +473,16 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
 
 <audio id="audio" hidden></audio>
 
+<script src="store.js"></script>
+<script type="module" src="sync.js"></script>
 <script>
 (() => {
 'use strict';
 
 const $ = id => document.getElementById(id);
-const KEY = 'speak.lessons.v1';
-const PREF = 'speak.prefs.v2';
+const ST = window.NTStore, PID = ST.cur(), K = ST.keys(PID);   // hồ sơ đang học
+const KEY = K.lessons;
+const PREF = K.prefs;
 const IS_ANDROID = /Android/i.test(navigator.userAgent);
 const PASS = 0.85;
 const PASS_KID = 0.7;              // bài trẻ em: dễ qua hơn
@@ -828,15 +860,17 @@ let msgTimer = null, nextTimer = null, queue = null;
 function lessons() {
   try { const v = JSON.parse(localStorage.getItem(KEY)); return Array.isArray(v) ? v : []; } catch { return []; }
 }
-function writeLessons(all) { try { localStorage.setItem(KEY, JSON.stringify(all)); } catch {} }
+function writeLessons(all) { try { localStorage.setItem(KEY, JSON.stringify(all)); } catch {} ST.changed(PID); }
 function putLesson(l) {
   const all = lessons(), i = all.findIndex(x => x.id === l.id);
-  if (i >= 0) all[i] = l; else all.unshift(l);
+  l.mod = Date.now();
+  const { justDone, ...keep } = l;   // trạng thái tạm, không lưu
+  if (i >= 0) all[i] = keep; else all.unshift(keep);
   writeLessons(all);
 }
 // Thêm các bài mẫu chưa từng thêm; bài mẫu đã bị xóa thì không thêm lại
 function seed() {
-  const SEEN = 'speak.samples.v1';
+  const SEEN = K.samples;
   let hasLessons = false, seen = null;
   try { hasLessons = localStorage.getItem(KEY) !== null; seen = JSON.parse(localStorage.getItem(SEEN)); } catch {}
   if (!Array.isArray(seen)) seen = hasLessons ? [SAMPLE.id] : [];   // máy đã dùng bản trước: bài Time-Management đã có
@@ -863,7 +897,7 @@ function loadPrefs() {
     for (const k of ['level', 'showVi', 'rate', 'voice']) if (k in v1) P[k] = v1[k];
   } catch {}
 }
-function savePrefs() { try { localStorage.setItem(PREF, JSON.stringify(P)); } catch {} }
+function savePrefs() { try { localStorage.setItem(PREF, JSON.stringify(P)); localStorage.setItem(K.prefsAt, String(Date.now())); } catch {} ST.changed(PID); }
 
 function say(text, keep) {
   const el = $('msg');
@@ -1925,7 +1959,7 @@ function go(i) {
   render();
 }
 function show(view) {
-  for (const id of ['home', 'create', 'practice']) $(id).hidden = id !== view;
+  for (const id of ['home', 'create', 'practice', 'account']) $(id).hidden = id !== view;
   $('dock').hidden = view !== 'practice';
   $('app').classList.toggle('has-dock', view === 'practice');
   window.scrollTo(0, 0);
@@ -1933,6 +1967,7 @@ function show(view) {
 function route() {
   stopAll(); say('');
   const h = decodeURIComponent(location.hash.slice(1));
+  if (h === 'hoso') { L = null; renderAccount(); show('account'); return; }
   if (h === 'moi') { L = null; newGroup = P.group; renderGroupIn(); show('create'); $('paste').focus({ preventScroll: true }); return; }
   if (h.startsWith('bai=')) {
     const all = lessons();
@@ -2079,7 +2114,7 @@ $('resetScores').addEventListener('click', e => {
 $('lessonList').addEventListener('click', e => {
   const del = e.target.closest('[data-del]');
   if (!del) return;
-  if (del.dataset.sure) { writeLessons(lessons().filter(l => l.id !== del.dataset.del)); renderList(); }
+  if (del.dataset.sure) { ST.markDeleted(PID, del.dataset.del); writeLessons(lessons().filter(l => l.id !== del.dataset.del)); renderList(); }
   else {
     del.dataset.sure = '1'; del.textContent = 'Xóa hẳn?';
     setTimeout(() => { if (del.isConnected) { delete del.dataset.sure; del.textContent = 'Xóa'; } }, 3000);
@@ -2104,6 +2139,89 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopAll(), renderDock(); });
 
+/* ---------- hồ sơ + tài khoản ---------- */
+function renderWho() {
+  const me = ST.profiles().find(p => p.id === PID);
+  const u = window.NTSync && window.NTSync.state.user;
+  const w = $('who'); w.textContent = '';
+  const b = document.createElement('b'); b.textContent = me ? me.name : '';
+  w.append('Đang học: ', b, u ? ' · đã lưu lên tài khoản' : ' · đổi người học');
+}
+function renderAccount() {
+  const ul = $('profileList'); ul.textContent = '';
+  const list = ST.profiles();
+  for (const p of list) {
+    const li = document.createElement('li'); if (p.id === PID) li.className = 'on';
+    const pick = document.createElement('button'); pick.type = 'button'; pick.className = 'pick'; pick.dataset.pick = p.id;
+    pick.textContent = p.name + (p.id === PID ? ' (đang học)' : '');
+    const ren = document.createElement('button'); ren.type = 'button'; ren.className = 'link muted'; ren.dataset.ren = p.id; ren.textContent = 'Đổi tên';
+    li.append(pick, ren);
+    if (list.length > 1) {
+      const del = document.createElement('button'); del.type = 'button'; del.className = 'link muted'; del.dataset.pdel = p.id; del.textContent = 'Xóa';
+      li.append(del);
+    }
+    ul.append(li);
+  }
+  renderAuth();
+}
+function renderAuth() {
+  const s = window.NTSync && window.NTSync.state;
+  const u = s && s.user;
+  $('signIn').hidden = !!u || !s; $('signOut').hidden = !u; $('syncNow').hidden = !u;
+  $('syncNow').disabled = !!(s && s.busy);
+  $('syncNow').textContent = s && s.busy ? 'Đang đồng bộ…' : 'Đồng bộ ngay';
+  let t;
+  if (!s) t = 'Đang tải phần đăng nhập… (cần mạng)';
+  else if (u) t = 'Đã đăng nhập: ' + (u.email || u.name) + '. Tiến độ của mọi hồ sơ tự lưu lên tài khoản và gộp với các máy khác.';
+  else t = 'Đăng nhập Google để giữ tiến độ khi đổi máy và học trên nhiều máy. Không đăng nhập vẫn học bình thường, dữ liệu lưu trên máy này.';
+  if (s && s.error) t += ' ' + s.error;
+  $('acctText').textContent = t;
+}
+$('profileList').addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.pick) {
+    if (t.dataset.pick === PID) { location.hash = ''; return; }
+    ST.setCur(t.dataset.pick); location.hash = ''; location.reload(); return;
+  }
+  if (t.dataset.ren) {
+    const p = ST.profiles().find(x => x.id === t.dataset.ren);
+    const name = prompt('Tên mới', p ? p.name : '');
+    if (name && name.trim()) { ST.renameProfile(t.dataset.ren, name.trim().slice(0, 30)); renderAccount(); renderWho(); }
+    return;
+  }
+  if (t.dataset.pdel) {
+    if (!t.dataset.sure) {
+      t.dataset.sure = '1'; t.textContent = 'Xóa hẳn cả tiến độ?';
+      setTimeout(() => { if (t.isConnected) { delete t.dataset.sure; t.textContent = 'Xóa'; } }, 3000);
+      return;
+    }
+    const wasMe = t.dataset.pdel === PID;
+    ST.removeProfile(t.dataset.pdel);
+    if (wasMe) { location.hash = 'hoso'; location.reload(); return; }
+    renderAccount();
+  }
+});
+$('addProfile').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = $('profileName').value.trim().slice(0, 30);
+  if (!name) { $('profileName').focus(); return; }
+  const p = ST.addProfile(name);
+  ST.setCur(p.id); location.hash = ''; location.reload();
+});
+$('signIn').addEventListener('click', () => window.NTSync && window.NTSync.signIn());
+$('signOut').addEventListener('click', () => window.NTSync && window.NTSync.signOut());
+$('syncNow').addEventListener('click', () => window.NTSync && window.NTSync.syncNow());
+window.addEventListener('nt-auth', () => { renderWho(); if (!$('account').hidden) renderAuth(); });
+// phần đồng bộ vừa gộp dữ liệu từ máy khác về
+window.NTApp = {
+  refresh() {
+    if (!ST.profiles().some(p => p.id === PID)) { location.reload(); return; }
+    loadPrefs(); renderWho();
+    if (!$('home').hidden) renderList();
+    else if (!$('account').hidden) renderAccount();
+  }
+};
+
 /* ---------- khởi động ---------- */
 loadPrefs();
 seed();
@@ -2113,6 +2231,7 @@ if (synth) {
   else synth.onvoiceschanged = loadVoices;
 }
 window.addEventListener('hashchange', route);
+renderWho();
 route();
 if (!SR) say('Trình duyệt này không chấm được lời nói. Dùng Chrome để được tô xanh đỏ từng từ; ở đây bạn vẫn thu âm và nghe lại được.', true);
 })();

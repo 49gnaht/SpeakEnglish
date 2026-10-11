@@ -34,3 +34,9 @@ Bài mẫu trẻ em mở lần lượt từ dễ đến khó: đọc đạt hế
 Phần chấm lời nói chạy tốt nhất trên Chrome và cần mạng. Trình duyệt khác vẫn thu âm và nghe lại được. Trên Chrome Android, phần nhận giọng tự ngắt khi bạn ngừng nói vài giây; trang tự mở lại, nhưng ngừng quá lâu giữa bài có thể mất vài từ.
 
 Bài và kết quả được lưu trong trình duyệt của từng máy.
+
+## Hồ sơ người học và đăng nhập
+
+- Bấm "Đang học: …" ở trang chủ để chọn hoặc thêm người học. Mỗi hồ sơ có tiến độ, bài khóa và giới hạn 4 bài/ngày riêng.
+- Đăng nhập Google (Firebase Auth) để lưu tiến độ của mọi hồ sơ lên Firestore và gộp giữa các máy. Không đăng nhập vẫn dùng được, dữ liệu lưu trên máy.
+- `store.js`: hồ sơ và khóa localStorage. `sync.js`: đăng nhập và đồng bộ. `firestore.rules`: quy tắc bảo mật dán vào Firebase Console.
