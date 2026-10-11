@@ -481,7 +481,61 @@ const SAMPLE_TOY = {
     ['That’s why it is my favorite toy.', 'Đó là lý do nó là món đồ chơi em yêu thích nhất.']
   ]
 };
-const SAMPLES = [SAMPLE, SAMPLE_HOBBY, SAMPLE_TOY];
+const SAMPLE_TEACHER = {
+  id: 'mau-teachers-day', group: 1,
+  title: 'Teacher’s Day', titleVi: 'Ngày Nhà giáo',
+  items: [
+    ['On Teacher’s day, I want to say thank you to all my teachers.', 'Nhân ngày Nhà giáo, em muốn cảm ơn đến tất cả thầy cô.'],
+    ['Teachers always guide us with patience and kindness.', 'Thầy cô luôn dạy chúng em với sự kiên nhẫn và tận tâm.'],
+    ['You not only teach us lessons from books, but also lessons for life.', 'Thầy cô không chỉ dạy kiến thức trong sách mà còn dạy bài học cuộc sống.'],
+    ['Your encouragement gives us confidence to keep trying every day.', 'Sự động viên của thầy cô giúp chúng em tự tin cố gắng mỗi ngày.'],
+    ['Thank you for believing in us even when we doubt ourselves.', 'Cảm ơn thầy cô đã tin tưởng chúng em ngay khi em nghi ngờ bản thân.'],
+    ['We truly appreciate all the hard work you do for your students.', 'Em trân trọng nỗ lực thầy cô dành cho học sinh.'],
+    ['On this 20/11, we wish all teachers happiness, health, and joy.', 'Ngày 20/11, chúng em chúc thầy cô hạnh phúc, khỏe mạnh và niềm vui.'],
+    ['Thank you for being the light that guides our path.', 'Cảm ơn thầy cô vì đã là ngọn đèn soi sáng con đường chúng em đi.']
+  ]
+};
+const SAMPLE_RICE = {
+  id: 'mau-rice', group: 1,
+  title: 'Rice', titleVi: 'Gạo',
+  items: [
+    ['Rice is an important food in many countries, especially in Asia.', 'Gạo là loại thực phẩm quan trọng ở nhiều nước, đặc biệt là tại châu Á.'],
+    ['It gives us energy and appears in our meals every day.', 'Gạo cung cấp năng lượng và có trong bữa ăn hằng ngày.'],
+    ['Farmers work hard to grow and harvest rice in the fields.', 'Người nông dân làm việc vất vả để trồng và thu hoạch lúa.'],
+    ['We can cook rice in many ways, like steaming or making fried rice.', 'Chúng ta có thể nấu cơm theo nhiều cách như hấp hay làm cơm chiên.'],
+    ['Rice is simple, but it plays a big role in our life.', 'Gạo đơn giản nhưng quan trọng trong cuộc sống của ta.']
+  ]
+};
+const SAMPLE_DORAEMON = {
+  id: 'mau-doraemon', group: 1,
+  title: 'My Favorite Character', titleVi: 'Nhân vật yêu thích của em',
+  items: [
+    ['My favorite character is Doraemon.', 'Nhân vật yêu thích của em là Doraemon.'],
+    ['He is a blue robot cat from the future.', 'Cậu là mèo máy màu xanh đến từ tương lai.'],
+    ['Doraemon has no ears and a big round face.', 'Doraemon không có tai và có mặt tròn to.'],
+    ['He has a magic pocket on his tummy.', 'Cậu ấy có một chiếc túi thần kỳ ở bụng.'],
+    ['He can take out many cool things from it, like a time machine or a flying tool.', 'Cậu có thể lấy nhiều món đồ tuyệt vời, như cỗ máy thời gian hay dụng cụ bay.'],
+    ['Doraemon is kind and always helps his friend Nobita.', 'Doraemon rất tốt bụng và luôn giúp bạn Nobita.'],
+    ['I love Doraemon because he is funny and smart.', 'Em yêu Doraemon vì cậu ấy vui tính và thông minh.'],
+    ['I wish I had a friend like Doraemon.', 'Em ước mình có bạn như Doraemon.']
+  ]
+};
+const SAMPLE_FRIDAY = {
+  id: 'mau-my-friday', group: 1,
+  title: 'My Friday', titleVi: 'Ngày thứ Sáu của mình',
+  items: [
+    ['On Friday, I get up at 6 o’clock.', 'Vào thứ Sáu, mình thức dậy lúc 6 giờ.'],
+    ['I brush my teeth and eat breakfast.', 'Mình đánh răng và ăn sáng.'],
+    ['I go to school at 7 o’clock.', 'Mình đến trường lúc 7 giờ.'],
+    ['I have English, Math, and Science.', 'Mình học tiếng Anh, Toán và Khoa học.'],
+    ['I eat lunch at school with my friends.', 'Mình ăn trưa ở trường cùng bạn bè.'],
+    ['In the afternoon, I play with my classmates.', 'Buổi chiều, mình chơi với các bạn trong lớp.'],
+    ['I go home at 5 o’clock.', 'Mình về nhà lúc 5 giờ.'],
+    ['In the evening, I do my homework and watch TV.', 'Buổi tối, mình làm bài tập và xem TV.'],
+    ['I go to bed at 9 o’clock.', 'Mình đi ngủ lúc 9 giờ.']
+  ]
+};
+const SAMPLES = [SAMPLE, SAMPLE_HOBBY, SAMPLE_TOY, SAMPLE_TEACHER, SAMPLE_RICE, SAMPLE_DORAEMON, SAMPLE_FRIDAY];
 const groupOf = l => (l.group === 1 ? 1 : 0);   // bài cũ chưa có nhóm: Người lớn
 
 const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: false, autoNext: false, loopListen: true, mode: 0, group: 0, noConcurrent: IS_ANDROID, silent: 0 };
@@ -581,11 +635,13 @@ const NUM = { zero: '0', one: '1', two: '2', three: '3', four: '4', five: '5', s
 // từ đồng âm máy hay viết lẫn
 const SAME = { too: 'to', two: 'to', '2': 'to', there: 'their', ok: 'okay', alright: 'allright' };
 // viết tắt: tách ra cho cả câu mẫu lẫn lời nói, để "it's" khớp "it is"
-const SHORT = { "can't": 'can not', "won't": 'will not', "shan't": 'shall not', "let's": 'let us', "i'm": 'i am' };
+const SHORT = { "can't": 'can not', "won't": 'will not', "shan't": 'shall not', "let's": 'let us', "i'm": 'i am',
+  "it's": 'it is', "that's": 'that is', "he's": 'he is', "she's": 'she is', "what's": 'what is', "there's": 'there is',
+  "here's": 'here is', "who's": 'who is', "where's": 'where is', "how's": 'how is' };
 function expand(w) {
   if (SHORT[w]) return SHORT[w];
   return w.replace(/n't$/, ' not').replace(/'re$/, ' are').replace(/'ll$/, ' will')
-    .replace(/'ve$/, ' have').replace(/'d$/, ' would').replace(/'s$/, ' is').replace(/'m$/, ' am');
+    .replace(/'ve$/, ' have').replace(/'d$/, ' would').replace(/'s$/, 's').replace(/'m$/, ' am');   // teacher's = teachers
 }
 function canon(w) {
   w = w.replace(/^'+|'+$/g, '');
@@ -595,6 +651,7 @@ function canon(w) {
 function normWords(s) {
   return String(s).toLowerCase()
     .replace(/[’‘`]/g, '\'')
+    .replace(/\b(\d{1,2}):00\b/g, "$1 o'clock")        // máy nhận giọng hay viết 6:00
     .replace(/[-–—/]/g, ' ')
     .replace(/[^a-z0-9' ]+/g, ' ')
     .split(/\s+/).map(w => expand(w.replace(/^'+|'+$/g, ''))).join(' ')
