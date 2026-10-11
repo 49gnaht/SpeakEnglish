@@ -11,7 +11,7 @@ Hai trang tĩnh, không cần cài đặt hay máy chủ. Mở: https://49gnaht.
 
 ## Bài viết (`doc.html`)
 
-Luyện nói theo một bài có chữ, ví dụ ảnh chụp một bài đăng.
+Luyện nói theo một bài có chữ, ví dụ ảnh chụp một bài đăng. Bài được chia hai nhóm **Người lớn** và **Trẻ em**; mỗi nhóm có bài mẫu sẵn, bài tự tạo thì chọn nhóm lúc lưu. Với bài trẻ em, lời nhờ Gemini nhận xét được viết nhẹ nhàng để bố mẹ đọc cho bé.
 
 1. Bấm "Tạo bài mới", chép câu lệnh có sẵn, gửi kèm ảnh cho ChatGPT.
 2. Dán kết quả ChatGPT trả về (mỗi câu tiếng Anh một dòng, dòng dịch ngay dưới) rồi lưu.

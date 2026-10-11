@@ -114,7 +114,7 @@ h1 { font-size: var(--t-lg); font-weight: 800; line-height: 1.25; letter-spacing
 .list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: center; }
 .lesson {
   display: grid; gap: 2px; padding: 12px 14px; text-align: left; cursor: pointer;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); color: var(--ink);
 }
 .lesson-t { font-weight: 600; overflow-wrap: anywhere; }
 .lesson-m { font-size: var(--t-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -205,6 +205,9 @@ select.field { height: 44px; padding: 0 10px; }
 /* cả bài */
 #practice[data-mode="1"] .only-s, #practice[data-mode="0"] .only-w { display: none !important; }
 .modesw { justify-self: start; }
+.groups { justify-self: start; }
+.groups button { min-height: 42px; padding: 0 16px; font-size: var(--t-sm); font-variant-numeric: tabular-nums; }
+.tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 5px; border: 1px solid var(--line); font-size: 11px; font-weight: 500; color: var(--muted); vertical-align: 2px; }
 .modesw button { min-height: 42px; padding: 0 16px; font-size: var(--t-sm); }
 .whole { font-size: 18px; line-height: 1.8; overflow-wrap: anywhere; }
 .whole .s { border-radius: 6px; padding: 2px 3px; cursor: pointer; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
@@ -242,8 +245,12 @@ select.field { height: 44px; padding: 0 10px; }
       <h1>Luyện nói</h1>
       <a class="btn primary" href="#moi">Tạo bài mới</a>
     </div>
+    <div class="seg groups" id="groupTabs" role="group" aria-label="Nhóm bài">
+      <button type="button" data-v="0">Người lớn</button>
+      <button type="button" data-v="1">Trẻ em</button>
+    </div>
     <ul class="list" id="lessonList"></ul>
-    <p class="hint" id="noLessons" hidden>Chưa có bài nào. Bấm Tạo bài mới, gửi ảnh cho ChatGPT rồi dán kết quả vào là luyện được.</p>
+    <p class="hint" id="noLessons" hidden></p>
     <section class="guide" aria-labelledby="guideHead">
       <h2 id="guideHead">Cách luyện một bài cho hiệu quả</h2>
       <ol class="steps">
@@ -279,6 +286,11 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
       <li><div class="step">
         <label for="titleIn"><b>Tên bài</b></label>
         <input class="field" id="titleIn" type="text" autocomplete="off" placeholder="Ví dụ: Time-Management">
+        <span class="opt-label" id="groupInLabel">Bài dành cho</span>
+        <div class="seg" id="groupIn" role="group" aria-labelledby="groupInLabel">
+          <button type="button" data-v="0">Người lớn</button>
+          <button type="button" data-v="1">Trẻ em</button>
+        </div>
       </div></li>
     </ol>
     <div class="row"><button class="btn primary" type="button" id="saveLesson" disabled>Lưu bài và bắt đầu luyện</button></div>
@@ -417,7 +429,7 @@ const IS_ANDROID = /Android/i.test(navigator.userAgent);
 const PASS = 0.85;
 
 const SAMPLE = {
-  id: 'mau-time-management',
+  id: 'mau-time-management', group: 0,
   title: 'Time-Management', titleVi: 'Quản lý thời gian',
   items: [
     ['Hello everyone.', 'Xin chào mọi người.'],
@@ -435,7 +447,7 @@ const SAMPLE = {
   ]
 };
 const SAMPLE_HOBBY = {
-  id: 'mau-my-favorite-hobby',
+  id: 'mau-my-favorite-hobby', group: 0,
   title: 'My Favorite Hobby', titleVi: 'Sở thích của tôi',
   items: [
     ['Hello everyone.', 'Xin chào mọi người.'],
@@ -455,9 +467,24 @@ const SAMPLE_HOBBY = {
     ['Thank you for listening.', 'Cảm ơn mọi người đã lắng nghe.']
   ]
 };
-const SAMPLES = [SAMPLE, SAMPLE_HOBBY];
+const SAMPLE_TOY = {
+  id: 'mau-my-favorite-toy', group: 1,
+  title: 'My Favorite Toy', titleVi: 'Đồ chơi em yêu thích',
+  items: [
+    ['My favorite toy is a small teddy bear.', 'Đồ chơi em yêu thích là một chú gấu bông nhỏ.'],
+    ['It is very soft and feels warm when I hug it.', 'Nó rất mềm và cảm giác thật ấm áp khi em ôm nó.'],
+    ['I keep it on my bed every night.', 'Em luôn để nó trên giường mỗi tối.'],
+    ['This toy makes me feel safe when I go to sleep.', 'Đồ chơi này khiến em cảm thấy an toàn khi đi ngủ.'],
+    ['I like to play with it after school.', 'Em thích chơi với nó sau giờ học.'],
+    ['Sometimes I tell it little stories.', 'Đôi khi em kể nó nghe chuyện.'],
+    ['It always makes me smile when I’m tired.', 'Nó luôn khiến em mỉm cười mỗi khi em mệt.'],
+    ['That’s why it is my favorite toy.', 'Đó là lý do nó là món đồ chơi em yêu thích nhất.']
+  ]
+};
+const SAMPLES = [SAMPLE, SAMPLE_HOBBY, SAMPLE_TOY];
+const groupOf = l => (l.group === 1 ? 1 : 0);   // bài cũ chưa có nhóm: Người lớn
 
-const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: false, autoNext: false, loopListen: true, mode: 0, noConcurrent: IS_ANDROID, silent: 0 };
+const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: false, autoNext: false, loopListen: true, mode: 0, group: 0, noConcurrent: IS_ANDROID, silent: 0 };
 let L = null, idx = 0;
 let peek = false, viOne = false, result = null, selfCheck = false;
 let msgTimer = null, nextTimer = null, queue = null;
@@ -480,11 +507,13 @@ function seed() {
   if (!Array.isArray(seen)) seen = hasLessons ? [SAMPLE.id] : [];   // máy đã dùng bản trước: bài Time-Management đã có
   const all = lessons();
   for (const smp of SAMPLES) {
+    const have = all.find(l => l.id === smp.id);
+    if (have && have.group == null) have.group = smp.group;     // bài mẫu cũ: gắn nhóm
     if (seen.includes(smp.id)) continue;
     seen.push(smp.id);
-    if (all.some(l => l.id === smp.id)) continue;
+    if (have) continue;
     all.push({
-      id: smp.id, title: smp.title, titleVi: smp.titleVi,
+      id: smp.id, title: smp.title, titleVi: smp.titleVi, group: smp.group, sample: true,
       items: smp.items.map(([en, vi]) => ({ en, vi })), best: {}, last: 0, created: Date.now()
     });
   }
@@ -831,7 +860,9 @@ async function toWav(blob) {
   return new Blob([out], { type: 'audio/wav' });
 }
 function aiPrompt() {
-  const lines = ['Tôi là người Việt đang luyện nói tiếng Anh.'];
+  const lines = groupOf(L) === 1
+    ? ['Người đọc là một bé người Việt đang học tiếng Anh. Hãy nhận xét nhẹ nhàng, dùng từ đơn giản để bố mẹ đọc cho bé nghe, khen điểm tốt trước rồi mới góp ý.']
+    : ['Tôi là người Việt đang luyện nói tiếng Anh.'];
   if (P.mode === 1) {
     lines.push('File âm thanh đính kèm là tôi đọc cả bài sau:', '', L.items.map(it => it.en).join(' '), '');
     const r = W.result;
@@ -1348,15 +1379,23 @@ function render() {
 }
 
 function renderList() {
-  const all = lessons(), ul = $('lessonList');
+  const everything = lessons(), ul = $('lessonList');
+  const all = everything.filter(l => groupOf(l) === P.group);
+  const counts = [0, 0]; everything.forEach(l => counts[groupOf(l)]++);
+  [...$('groupTabs').children].forEach((b, i) => {
+    b.textContent = (i ? 'Trẻ em' : 'Người lớn') + ' (' + counts[i] + ')';
+    b.setAttribute('aria-pressed', String(i === P.group));
+  });
   ul.textContent = '';
   $('noLessons').hidden = all.length > 0;
+  $('noLessons').textContent = 'Chưa có bài ' + (P.group ? 'cho trẻ em' : 'cho người lớn') + '. Bấm Tạo bài mới, gửi ảnh cho ChatGPT rồi dán kết quả vào là luyện được.';
   for (const l of all) {
     const li = document.createElement('li');
     const a = document.createElement('a');
     a.className = 'lesson'; a.href = '#bai=' + encodeURIComponent(l.id);
     a.style.textDecoration = 'none';
     const t = document.createElement('span'); t.className = 'lesson-t'; t.textContent = l.title || 'Bài không tên';
+    if (l.sample || /^mau-/.test(l.id)) { const tg = document.createElement('span'); tg.className = 'tag'; tg.textContent = 'Bài mẫu'; t.append(tg); }
     const ok = l.items.filter((_, i) => (l.best && l.best[i] || 0) >= PASS).length;
     const m = document.createElement('span'); m.className = 'lesson-m';
     const lw = l.whole && l.whole[l.whole.length - 1];
@@ -1401,7 +1440,7 @@ function show(view) {
 function route() {
   stopAll(); say('');
   const h = decodeURIComponent(location.hash.slice(1));
-  if (h === 'moi') { L = null; show('create'); $('paste').focus({ preventScroll: true }); return; }
+  if (h === 'moi') { L = null; newGroup = P.group; renderGroupIn(); show('create'); $('paste').focus({ preventScroll: true }); return; }
   if (h.startsWith('bai=')) {
     const l = lessons().find(x => x.id === h.slice(4));
     if (l) {
@@ -1444,14 +1483,19 @@ function onPaste() {
 }
 $('paste').addEventListener('input', onPaste);
 $('titleIn').addEventListener('input', () => { titleTouched = !!$('titleIn').value; });
+let newGroup = 0;
+function renderGroupIn() { setSeg('groupIn', newGroup); }
+$('groupIn').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { newGroup = +b.dataset.v; renderGroupIn(); } });
+$('groupTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; P.group = +b.dataset.v; savePrefs(); renderList(); });
 $('saveLesson').addEventListener('click', () => {
   if (!parsed || !parsed.items.length) return;
   const title = $('titleIn').value.trim() || parsed.items[0].en.split(' ').slice(0, 5).join(' ');
   const l = {
     id: Date.now().toString(36), title, titleVi: title === parsed.title ? parsed.titleVi : '',
-    items: parsed.items, best: {}, last: 0, created: Date.now()
+    group: newGroup, items: parsed.items, best: {}, last: 0, created: Date.now()
   };
   putLesson(l);
+  P.group = newGroup; savePrefs();
   $('paste').value = ''; $('titleIn').value = ''; titleTouched = false; onPaste();
   location.hash = 'bai=' + l.id;
 });
