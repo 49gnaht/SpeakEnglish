@@ -447,7 +447,7 @@ const SAMPLE = {
   ]
 };
 const SAMPLE_HOBBY = {
-  id: 'mau-my-favorite-hobby', group: 0,
+  id: 'mau-my-favorite-hobby', group: 1,
   title: 'My Favorite Hobby', titleVi: 'Sở thích của tôi',
   items: [
     ['Hello everyone.', 'Xin chào mọi người.'],
@@ -535,7 +535,58 @@ const SAMPLE_FRIDAY = {
     ['I go to bed at 9 o’clock.', 'Mình đi ngủ lúc 9 giờ.']
   ]
 };
-const SAMPLES = [SAMPLE, SAMPLE_HOBBY, SAMPLE_TOY, SAMPLE_TEACHER, SAMPLE_RICE, SAMPLE_DORAEMON, SAMPLE_FRIDAY];
+const SAMPLE_SORRY = {
+  id: 'mau-sorry-mom', group: 1,
+  title: 'Sorry, Mom', titleVi: 'Xin lỗi mẹ',
+  items: [
+    ['I play games and I do not do my homework.', 'Mình chơi game và không làm bài tập.'],
+    ['My mom sees it and she shouts at me.', 'Mẹ thấy vậy và mẹ mắng mình.'],
+    ['I feel sad and I want to cry.', 'Mình buồn và muốn khóc.'],
+    ['I think and I know I am wrong.', 'Mình nghĩ và biết là mình sai.'],
+    ['I say sorry to my mom.', 'Mình xin lỗi mẹ.'],
+    ['She smiles and hugs me.', 'Mẹ cười và ôm mình.'],
+    ['I promise I am good next time.', 'Mình hứa lần sau sẽ ngoan.']
+  ]
+};
+const SAMPLE_TEST = {
+  id: 'mau-english-test', group: 1,
+  title: 'My English Test', titleVi: 'Bài kiểm tra tiếng Anh',
+  items: [
+    ['Today I am so happy!', 'Hôm nay em rất vui!'],
+    ['I got 10 points in my English test.', 'Em được 10 điểm trong bài kiểm tra tiếng Anh.'],
+    ['I worked hard and I did my best.', 'Em đã học chăm chỉ và cố gắng hết sức.'],
+    ['My teacher smiled and said, "Good job!"', 'Cô giáo cười và nói: “Làm tốt lắm!”'],
+    ['My mom and dad are proud of me.', 'Bố mẹ em rất tự hào về em.'],
+    ['I feel like a star.', 'Em cảm thấy như một ngôi sao.'],
+    ['I want to keep learning English every day.', 'Em muốn tiếp tục học tiếng Anh mỗi ngày.']
+  ]
+};
+const SAMPLE_SUNNY = {
+  id: 'mau-sunny-day', group: 1,
+  title: 'A Sunny Day', titleVi: 'Một ngày nắng',
+  items: [
+    ['Today is a sunny day.', 'Hôm nay là một ngày nắng.'],
+    ['The sky is blue and there are no clouds.', 'Bầu trời màu xanh và không có mây.'],
+    ['I wear my hat and sunglasses.', 'Tôi đội mũ và đeo kính.'],
+    ['I go to the park with my dog.', 'Tôi đi công viên với chú chó của mình.'],
+    ['We run and play on the grass.', 'Chúng tôi chạy và chơi trên bãi cỏ.'],
+    ['I eat ice cream and drink water.', 'Tôi ăn kem và uống nước.'],
+    ['The sun is hot, but I feel happy.', 'Trời nắng nóng, nhưng tôi thấy rất vui.'],
+    ['Sunny days are my favorite!', 'Những ngày nắng là ngày tôi thích nhất!']
+  ]
+};
+const SAMPLE_BEDTIME = {
+  id: 'mau-bedtime-story', group: 1,
+  title: 'Bedtime Story', titleVi: 'Chuyện kể trước giờ ngủ',
+  items: [
+    ['Every night I go to bed and my mom tells me a story.', 'Mỗi tối em đi ngủ và mẹ kể cho em một câu chuyện.'],
+    ['I lie on my soft bed and listen.', 'Em nằm trên chiếc giường mềm và lắng nghe.'],
+    ['The story is about animals and I like the little rabbit.', 'Câu chuyện là về những con vật và em thích chú thỏ nhỏ.'],
+    ['My mom’s voice is sweet and I feel happy and safe.', 'Giọng mẹ thật ngọt ngào và em thấy vui và an toàn.'],
+    ['Then I close my eyes and sleep.', 'Rồi em nhắm mắt và ngủ.']
+  ]
+};
+const SAMPLES = [SAMPLE, SAMPLE_HOBBY, SAMPLE_TOY, SAMPLE_TEACHER, SAMPLE_RICE, SAMPLE_DORAEMON, SAMPLE_FRIDAY, SAMPLE_SORRY, SAMPLE_TEST, SAMPLE_SUNNY, SAMPLE_BEDTIME];
 const groupOf = l => (l.group === 1 ? 1 : 0);   // bài cũ chưa có nhóm: Người lớn
 
 const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: false, autoNext: false, loopListen: true, mode: 0, group: 0, noConcurrent: IS_ANDROID, silent: 0 };
@@ -562,7 +613,7 @@ function seed() {
   const all = lessons();
   for (const smp of SAMPLES) {
     const have = all.find(l => l.id === smp.id);
-    if (have && have.group == null) have.group = smp.group;     // bài mẫu cũ: gắn nhóm
+    if (have) have.group = smp.group;     // nhóm của bài mẫu luôn theo định nghĩa ở đây (có thể đã đổi)
     if (seen.includes(smp.id)) continue;
     seen.push(smp.id);
     if (have) continue;
@@ -1502,6 +1553,7 @@ function route() {
     const l = lessons().find(x => x.id === h.slice(4));
     if (l) {
       L = l; L.best = L.best || {};
+      if (P.group !== groupOf(l)) { P.group = groupOf(l); savePrefs(); }   // quay lại danh sách đúng tab
       queue = null; W.result = null; W.live = null; W.peek = false;
       show('practice');
       go(Math.min(L.last || 0, L.items.length - 1));
