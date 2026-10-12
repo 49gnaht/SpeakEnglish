@@ -268,6 +268,44 @@ select.field { height: 44px; padding: 0 10px; }
 .cal span.ok { background: var(--good-bg); color: var(--ink); box-shadow: inset 0 0 0 1px var(--good); }
 .cal span.now { outline: 2px solid var(--accent); outline-offset: -2px; }
 .cal span i { font-style: normal; font-size: 14px; }
+.td-more { font-size: var(--t-xs); justify-self: start; }
+.panel { display: grid; gap: 8px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; min-width: 0; }
+.panel h2, #stats h2, #parents h2 { font-size: var(--t-sm); font-weight: 700; margin: 0; }
+.panel h2.sub { margin-top: 8px; }
+.panel .hint { margin: 0; }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.tile { padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 2px; }
+.tile b { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.tile span { font-size: var(--t-xs); color: var(--muted); }
+.tile .up { color: var(--good); font-weight: 600; }
+.bars { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 140px; padding-top: 8px; border-bottom: 1px solid var(--line); }
+.bars button { flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: flex-end; justify-content: center; background: none; border: 0; padding: 0; cursor: pointer; }
+.bars button i { display: block; width: 100%; max-width: 28px; min-height: 2px; background: var(--good); border-radius: 4px 4px 0 0; }
+.bars button.zero i { background: var(--line); }
+.bars button:hover i, .bars button[aria-pressed="true"] i { filter: brightness(0.85); }
+.bars .goal-line { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--muted); opacity: 0.5; pointer-events: none; }
+.bars-x { display: flex; gap: 2px; font-size: 11px; color: var(--muted); }
+.bars-x span { flex: 1 1 0; min-width: 0; text-align: center; overflow: hidden; white-space: nowrap; }
+.tip { margin: 0; font-size: var(--t-xs); min-height: 1.5em; }
+.wholes { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.wholes li { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 4px 12px; align-items: center; }
+.wholes .t { font-weight: 600; overflow-wrap: anywhere; }
+.wholes .m { grid-column: 1 / -1; font-size: var(--t-xs); color: var(--muted); }
+.wholes svg { width: 120px; height: 36px; grid-row: 1; grid-column: 2; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips span { padding: 4px 10px; border-radius: 999px; font-size: var(--t-xs); background: var(--bad-bg); color: var(--ink); }
+.chips.good span { background: var(--good-bg); }
+.chips em { font-style: normal; color: var(--muted); margin-left: 4px; }
+.pcards { display: grid; gap: 12px; }
+.pcard { display: grid; gap: 10px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.pcard .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; text-align: center; font-size: 11px; color: var(--muted); }
+.pcard .week span { display: grid; gap: 2px; place-items: center; padding: 4px 0; border-radius: 8px; background: var(--bg); }
+.pcard .week span.ok { background: var(--good-bg); color: var(--ink); }
+.pcard .week span.part { background: var(--lane); color: var(--ink); }
+.pcard dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: var(--t-xs); }
+.pcard dt { color: var(--muted); white-space: nowrap; }
+.pcard dd { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pcard .note { margin: 0; font-size: var(--t-xs); }
 .acct b { font-size: var(--t-sm, 16px); }
 .lock-note { font-size: var(--t-xs); color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .keys { font-size: var(--t-xs); color: var(--muted); }
@@ -296,6 +334,7 @@ select.field { height: 44px; padding: 0 10px; }
       <div class="meter goal"><i id="tdBar"></i></div>
       <p class="td-main" id="tdText"></p>
       <p class="td-praise" id="tdPraise"></p>
+      <a class="link td-more" href="#thongke">Xem thống kê tiến bộ →</a>
       <details class="cal-wrap" id="calWrap">
         <summary>Lịch học tháng này</summary>
         <div class="cal" id="calGrid"></div>
@@ -333,6 +372,7 @@ select.field { height: 44px; padding: 0 10px; }
       <input class="field grow" id="profileName" type="text" maxlength="30" autocomplete="off" placeholder="Tên người học, ví dụ: Bé An">
       <button class="btn" type="submit">Thêm</button>
     </form>
+    <a class="btn" href="#bome">Tổng kết tuần cho bố mẹ</a>
     <div class="card acct" id="acct">
       <b>Lưu lên tài khoản</b>
       <p class="hint" id="acctText">Đăng nhập Google để giữ tiến độ khi đổi máy và học trên nhiều máy. Không đăng nhập vẫn học bình thường, dữ liệu lưu trên máy này.</p>
@@ -342,6 +382,51 @@ select.field { height: 44px; padding: 0 10px; }
         <button class="btn" type="button" id="signOut" hidden>Đăng xuất</button>
       </div>
     </div>
+  </section>
+
+  <!-- thống kê của hồ sơ đang học -->
+  <section class="view" id="stats" hidden>
+    <a class="link muted" href="#">← Bài đã lưu</a>
+    <h1 id="stHead">Tiến bộ của bạn</h1>
+    <div class="tiles" id="stTiles"></div>
+    <section class="panel">
+      <h2>Câu đạt mỗi ngày</h2>
+      <p class="hint">14 ngày gần nhất. Vạch đứt là mục tiêu ngày.</p>
+      <div class="bars" id="stDays"></div>
+      <p class="tip" id="stDaysTip" aria-live="polite"></p>
+    </section>
+    <section class="panel">
+      <h2>Đúng ngay lần đầu</h2>
+      <p class="hint">Tỉ lệ câu nói đạt ngay lần thử đầu tiên, theo tuần. Cột càng cao là nói càng chắc.</p>
+      <div class="bars weeks" id="stFirst"></div>
+      <p class="tip" id="stFirstTip" aria-live="polite"></p>
+    </section>
+    <section class="panel">
+      <h2>Điểm nói cả bài</h2>
+      <p class="hint">Mỗi chấm là một lần nói cả bài, từ trái sang phải theo thời gian.</p>
+      <ul class="wholes" id="stWhole"></ul>
+    </section>
+    <section class="panel">
+      <h2>Từ đã chinh phục</h2>
+      <p class="hint">Từng bị đỏ, sau đó nói đúng liền 2 lần.</p>
+      <div class="chips good" id="stWon"></div>
+      <h2 class="sub">Từ cần luyện thêm</h2>
+      <div class="chips" id="stTodo"></div>
+    </section>
+    <a class="btn" href="#bome">Tổng kết tuần cho bố mẹ</a>
+  </section>
+
+  <!-- tổng kết tuần cho bố mẹ: mọi hồ sơ -->
+  <section class="view" id="parents" hidden>
+    <a class="link muted" href="#">← Bài đã lưu</a>
+    <h1>Tổng kết tuần</h1>
+    <div class="seg" id="pwWeek" role="group" aria-label="Chọn tuần">
+      <button type="button" data-v="0">Tuần này</button>
+      <button type="button" data-v="1">Tuần trước</button>
+    </div>
+    <p class="hint" id="pwRange"></p>
+    <div class="pcards" id="pwCards"></div>
+    <p class="hint">Số liệu tính từ khi có nhật ký học (12/10/2026). Hồ sơ học trên máy khác cần đăng nhập để thấy ở đây.</p>
   </section>
 
   <section class="view" id="create" hidden>
@@ -1586,6 +1671,7 @@ async function finishWhole() {
   L.whole = (L.whole || []).concat({ ts: Date.now(), score: Math.floor(r.score * 1000) / 1000, secs: Math.round(secs), wpm: r.wpm, level: P.level }).slice(-20);
   if (inSeq(L) && !wasDone && isDone(L)) L.justDone = true;
   putLesson(L);
+  logWords(L.items.flatMap((it, si) => tokens(it.en).map((t, k) => [t.subs.join(' '), r.marks[si] ? r.marks[si][k] : null])));
   const goalHit = logWhole(L, r.score);
   render();
   if (goalHit) goalReached();
@@ -1672,7 +1758,9 @@ function finish(r) {
   const best = L.best[idx] || 0;
   if (eff > best) L.best[idx] = Math.floor(eff * 1000) / 1000;
   putLesson(L);
-  const red = tokens(L.items[idx].en).filter((t, k) => r.marks[k] === false).map(t => t.subs.join(' '));
+  const tk = tokens(L.items[idx].en);
+  const red = tk.filter((t, k) => r.marks[k] === false).map(t => t.subs.join(' '));
+  logWords(tk.map((t, k) => [t.subs.join(' '), r.marks[k]]));
   const goalHit = logSentence(L, idx, passed, red);
   render();
   if (goalHit) goalReached();
@@ -1995,7 +2083,7 @@ function go(i) {
   render();
 }
 function show(view) {
-  for (const id of ['home', 'create', 'practice', 'account']) $(id).hidden = id !== view;
+  for (const id of ['home', 'create', 'practice', 'account', 'stats', 'parents']) $(id).hidden = id !== view;
   $('dock').hidden = view !== 'practice';
   $('app').classList.toggle('has-dock', view === 'practice');
   window.scrollTo(0, 0);
@@ -2003,6 +2091,8 @@ function show(view) {
 function route() {
   stopAll(); say('');
   const h = decodeURIComponent(location.hash.slice(1));
+  if (h === 'thongke') { L = null; renderStats(); show('stats'); return; }
+  if (h === 'bome') { L = null; renderParents(); show('parents'); return; }
   if (h === 'hoso') { L = null; renderAccount(); show('account'); return; }
   if (h === 'moi') { L = null; newGroup = P.group; renderGroupIn(); show('create'); $('paste').focus({ preventScroll: true }); return; }
   if (h.startsWith('bai=')) {
@@ -2295,6 +2385,232 @@ function renderToday() {
   }
 }
 
+/* ---------- từ: từng đỏ rồi nói đúng ---------- */
+// mỗi từ: [số lần đỏ, số lần đúng liền từ lần đỏ gần nhất, ngày chinh phục]
+const wordKey = id => ST.keys(id).words;
+function wordsOf(id) { try { const v = JSON.parse(localStorage.getItem(wordKey(id))); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } }
+const countable = w => w && w.length > 2 && !STOP.has(w) && !/^\d+$/.test(w);
+function logWords(pairs) {
+  const d = wordsOf(PID); let touched = false;
+  for (const [w, ok] of pairs) {
+    if (!countable(w) || ok === null || ok === undefined) continue;
+    const e = d[w];
+    if (ok === false) { const x = e || [0, 0, '']; x[0]++; x[1] = 0; x[2] = ''; d[w] = x; touched = true; }
+    else if (e && !e[2]) { e[1]++; if (e[1] >= 2) e[2] = today(); touched = true; }
+  }
+  if (touched) { try { localStorage.setItem(wordKey(PID), JSON.stringify(d)); } catch {} }
+}
+
+/* ---------- thống kê ---------- */
+const DOW = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+function weekStart(dt) { const d = new Date(dt); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d; }
+function addDays(dt, n) { const d = new Date(dt); d.setDate(d.getDate() + n); return d; }
+function sumRange(d, from, n) {   // gộp n ngày bắt đầu từ ngày from
+  const t = { days: 0, okDays: 0, said: 0, first: 0, passed: 0, sec: 0, w: 0, triesSum: 0, triesN: 0 };
+  for (let k = 0; k < n; k++) {
+    const s = dayStats(d[ymd(addDays(from, k))]);
+    if (s.said || s.w) t.days++;
+    if (s.ok) t.okDays++;
+    t.said += s.said; t.first += s.first; t.passed += s.passed; t.sec += s.sec; t.w += s.w;
+    if (s.avg) { const n2 = Object.values((d[ymd(addDays(from, k))] || {}).s || {}).filter(e => e[1]).length; t.triesSum += s.avg * n2; t.triesN += n2; }
+  }
+  t.avg = t.triesN ? t.triesSum / t.triesN : 0;
+  t.firstPct = t.said ? t.first / t.said : 0;
+  return t;
+}
+function bestStreak(d) {
+  let best = 0, cur = 0;
+  const ks = Object.keys(d).filter(k => d[k] && d[k].ok).sort();
+  let prev = null;
+  for (const k of ks) {
+    const dt = new Date(k + 'T00:00:00');
+    cur = prev && Math.round((dt - prev) / 864e5) <= 2 ? cur + 1 : 1;   // cho phép nghỉ 1 ngày
+    best = Math.max(best, cur); prev = dt;
+  }
+  return best;
+}
+function barChart(box, tip, items, max, goal) {
+  box.textContent = '';
+  const x = document.createElement('div'); x.className = 'bars-x';
+  const top = Math.max(max, goal || 0, 1);
+  items.forEach((it, k) => {
+    const b = document.createElement('button'); b.type = 'button';
+    if (!it.v) b.classList.add('zero');
+    b.setAttribute('aria-label', it.tip);
+    const i = document.createElement('i'); i.style.height = (it.v / top * 100) + '%';
+    b.append(i);
+    b.addEventListener('click', () => { box.querySelectorAll('button').forEach(o => o.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); tip.textContent = it.tip; });
+    b.addEventListener('mouseenter', () => { tip.textContent = it.tip; });
+    box.append(b);
+    const lb = document.createElement('span'); lb.textContent = it.label; x.append(lb);
+  });
+  if (goal) { const g = document.createElement('div'); g.className = 'goal-line'; g.style.bottom = 'calc((100% - 8px) * ' + (goal / top) + ')'; box.append(g); }
+  const old = box.nextElementSibling;
+  if (old && old.classList.contains('bars-x')) old.remove();
+  box.after(x);
+  const last = [...items].reverse().find(it => it.v);
+  tip.textContent = last ? last.tip : 'Chưa có số liệu.';
+}
+function spark(scores) {
+  const W = 120, H = 36, n = scores.length, pad = 4;
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.setAttribute('aria-hidden', 'true');
+  const pt = (v, k) => [n === 1 ? W / 2 : pad + k * (W - 2 * pad) / (n - 1), H - pad - v * (H - 2 * pad)];
+  if (n > 1) {
+    const pl = document.createElementNS(ns, 'polyline');
+    pl.setAttribute('points', scores.map((v, k) => pt(v, k).join(',')).join(' '));
+    pl.setAttribute('fill', 'none'); pl.setAttribute('stroke', 'var(--accent)'); pl.setAttribute('stroke-width', '2'); pl.setAttribute('stroke-linejoin', 'round');
+    svg.append(pl);
+  }
+  scores.forEach((v, k) => {
+    if (k !== n - 1 && n > 6) return;
+    const c = document.createElementNS(ns, 'circle'); const [cx, cy] = pt(v, k);
+    c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', k === n - 1 ? 4 : 3);
+    c.setAttribute('fill', 'var(--accent)'); c.setAttribute('stroke', 'var(--surface)'); c.setAttribute('stroke-width', '2');
+    svg.append(c);
+  });
+  return svg;
+}
+const pct = v => Math.round(v * 100) + '%';
+function tile(b, label, extra) {
+  const t = document.createElement('div'); t.className = 'tile';
+  const v = document.createElement('b'); v.textContent = b;
+  const l = document.createElement('span'); l.textContent = label;
+  t.append(v, l);
+  if (extra) { const e = document.createElement('span'); e.className = extra.up ? 'up' : ''; e.textContent = extra.text; t.append(e); }
+  return t;
+}
+function cmp(now, before, unit) {
+  if (!before) return null;
+  const diff = now - before;
+  if (diff > 0) return { up: true, text: '▲ ' + diff + (unit || '') + ' so với 7 ngày trước' };
+  if (diff < 0) return { up: false, text: '7 ngày trước: ' + before + (unit || '') };
+  return { up: false, text: 'Bằng 7 ngày trước' };
+}
+function renderStats() {
+  const me = ST.profiles().find(p => p.id === PID);
+  $('stHead').textContent = 'Tiến bộ của ' + (me ? me.name : 'bạn');
+  const d = days(), now = new Date(), ws = weekStart(now), goal = P.goal || 10;
+  const tw = sumRange(d, addDays(now, -6), 7), lw = sumRange(d, addDays(now, -13), 7);   // 7 ngày qua so với 7 ngày trước đó
+  const T = $('stTiles'); T.textContent = '';
+  T.append(
+    tile(tw.days + '/7', 'ngày học trong 7 ngày qua', cmp(tw.days, lw.days, ' ngày')),
+    tile(tw.passed, 'câu đạt trong 7 ngày qua', cmp(tw.passed, lw.passed, ' câu')),
+    tile(Math.round(tw.sec / 60), 'phút luyện trong 7 ngày qua', cmp(Math.round(tw.sec / 60), Math.round(lw.sec / 60), ' phút')),
+    tile((streakInfo(d).n || 0) + ' ngày', 'chuỗi hiện tại', { up: false, text: 'Dài nhất: ' + Math.max(bestStreak(d), streakInfo(d).n) + ' ngày' })
+  );
+  // 14 ngày
+  const items = [];
+  for (let k = 13; k >= 0; k--) {
+    const dt = addDays(now, -k), s = dayStats(d[ymd(dt)]);
+    items.push({ v: s.passed, label: k % 2 ? '' : dt.getDate() + '', tip: DOW[dt.getDay()] + ' ' + dt.getDate() + '/' + (dt.getMonth() + 1) + ': ' + s.passed + ' câu đạt' + (s.said ? ', ' + s.first + '/' + s.said + ' đúng ngay lần đầu' : '') + (s.ok ? ' ⭐' : '') });
+  }
+  barChart($('stDays'), $('stDaysTip'), items, Math.max(...items.map(i => i.v)), goal);
+  // 6 tuần: tỉ lệ đúng ngay lần đầu
+  const wk = [];
+  for (let k = 5; k >= 0; k--) {
+    const from = addDays(ws, -7 * k), t = sumRange(d, from, 7);
+    wk.push({ v: t.firstPct * 100, label: k ? from.getDate() + '/' + (from.getMonth() + 1) : 'Tuần này', tip: (k ? 'Tuần từ ' + from.getDate() + '/' + (from.getMonth() + 1) : 'Tuần này') + ': ' + (t.said ? pct(t.firstPct) + ' đúng ngay lần đầu (' + t.first + '/' + t.said + ' câu)' + (t.avg ? ', trung bình ' + t.avg.toFixed(1) + ' lần là qua' : '') : 'chưa luyện') });
+  }
+  barChart($('stFirst'), $('stFirstTip'), wk, 100, 0);
+  // điểm cả bài
+  const ul = $('stWhole'); ul.textContent = '';
+  const ws2 = lessons().filter(l => (l.whole || []).length).sort((a, b) => b.whole.at(-1).ts - a.whole.at(-1).ts).slice(0, 8);
+  if (!ws2.length) { const li = document.createElement('li'); li.className = 'hint'; li.textContent = 'Chưa có lần nói cả bài nào. Chọn chế độ Cả bài trong màn luyện để thử.'; ul.append(li); }
+  for (const l of ws2) {
+    const sc = l.whole.map(h => h.score || 0), best = Math.max(...sc);
+    const li = document.createElement('li');
+    const t = document.createElement('span'); t.className = 't'; t.textContent = l.title || 'Bài không tên';
+    const m = document.createElement('span'); m.className = 'm';
+    const wpm = l.whole.at(-1).wpm;
+    m.textContent = sc.length === 1 ? 'Lần đầu ' + pct(sc[0]) + (wpm ? ' · ' + wpm + ' từ/phút' : '')
+      : 'Lần đầu ' + pct(sc[0]) + ' → gần nhất ' + pct(sc.at(-1)) + ' · cao nhất ' + pct(best) + ' · ' + sc.length + ' lần' + (wpm ? ' · ' + wpm + ' từ/phút' : '');
+    li.append(t, spark(sc), m);
+    ul.append(li);
+  }
+  // từ
+  const wd = wordsOf(PID);
+  const won = Object.entries(wd).filter(([, e]) => e[2]).sort((a, b) => (b[1][2] > a[1][2] ? 1 : -1));
+  const todo = Object.entries(wd).filter(([, e]) => !e[2]).sort((a, b) => b[1][0] - a[1][0]).slice(0, 15);
+  const chips = (box, arr, label, empty) => {
+    box.textContent = '';
+    if (!arr.length) { const s = document.createElement('p'); s.className = 'hint'; s.textContent = empty; box.append(s); return; }
+    for (const [w, e] of arr) { const c = document.createElement('span'); c.textContent = w; if (label) { const em = document.createElement('em'); em.textContent = label(e); c.append(em); } box.append(c); }
+  };
+  chips($('stWon'), won.slice(0, 40), null, 'Chưa có. Từ nào bị đỏ, luyện lại đến khi xanh 2 lần là vào đây.');
+  if (won.length > 40) { const s = document.createElement('span'); s.textContent = '+' + (won.length - 40) + ' từ nữa'; $('stWon').append(s); }
+  chips($('stTodo'), todo, e => '×' + e[0], 'Chưa có từ nào khó.');
+}
+
+/* ---------- tổng kết cho bố mẹ ---------- */
+let pwOff = new Date().getDay() === 1 ? 1 : 0;   // thứ Hai: mặc định xem tuần trước
+function renderParents() {
+  $('pwWeek').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === pwOff)));
+  const now = new Date(), ws = addDays(weekStart(now), -7 * pwOff), we = addDays(ws, 6);
+  $('pwRange').textContent = 'Tuần ' + ws.getDate() + '/' + (ws.getMonth() + 1) + ' – ' + we.getDate() + '/' + (we.getMonth() + 1) + '/' + we.getFullYear();
+  const box = $('pwCards'); box.textContent = '';
+  for (const p of ST.profiles()) {
+    const k = ST.keys(p.id);
+    let d = {}, ls = [], pr = {};
+    try { d = JSON.parse(localStorage.getItem(k.days)) || {}; } catch {}
+    try { ls = JSON.parse(localStorage.getItem(k.lessons)) || []; } catch {}
+    try { pr = JSON.parse(localStorage.getItem(k.prefs)) || {}; } catch {}
+    const goal = pr.goal || 10;
+    const tw = sumRange(d, ws, 7), lw = sumRange(d, addDays(ws, -7), 7);
+    const c = document.createElement('article'); c.className = 'pcard';
+    const h = document.createElement('div'); h.className = 'spread';
+    const nm = document.createElement('h2'); nm.textContent = p.name;
+    const st = document.createElement('span'); st.className = 'streak';
+    const sn = streakInfo(d).n;
+    st.textContent = sn ? '🔥 ' + sn + ' ngày' : '';
+    h.append(nm, st); c.append(h);
+    // 7 ngày trong tuần
+    const wk = document.createElement('div'); wk.className = 'week';
+    for (let i = 0; i < 7; i++) {
+      const dt = addDays(ws, i), s = dayStats(d[ymd(dt)]);
+      const cell = document.createElement('span');
+      if (s.ok) cell.classList.add('ok'); else if (s.said || s.w) cell.classList.add('part');
+      cell.append(DOW[dt.getDay()]);
+      const v = document.createElement('b'); v.textContent = dt > now ? '·' : s.ok ? '⭐' : (s.passed ? s.passed : '–');
+      cell.append(v); wk.append(cell);
+    }
+    c.append(wk);
+    const dl = document.createElement('dl');
+    const row = (a, b) => { const dt = document.createElement('dt'); dt.textContent = a; const dd = document.createElement('dd'); dd.textContent = b; dl.append(dt, dd); };
+    const wsKey = ymd(ws);
+    const weKey = ymd(we);
+    const started = ls.filter(l => l.started && l.started >= wsKey && l.started <= weKey).length;
+    row('Ngày học', tw.days + '/7');
+    row('Đạt mục tiêu (' + goal + ' câu)', tw.okDays + ' ngày');
+    row('Câu nói đạt', tw.passed + (lw.passed ? ' (tuần trước ' + lw.passed + ')' : ''));
+    row('Thời gian luyện', Math.round(tw.sec / 60) + ' phút' + (lw.sec >= 60 ? ' (tuần trước ' + Math.round(lw.sec / 60) + ')' : ''));
+    row('Đúng ngay lần đầu', tw.said ? pct(tw.firstPct) + (lw.said ? ' (tuần trước ' + pct(lw.firstPct) + ')' : '') : '–');
+    row('Bài mới bắt đầu', String(started));
+    row('Nói cả bài', tw.w + ' lần');
+    c.append(dl);
+    // nhận xét ngắn
+    const notes = [];
+    if (!tw.days) notes.push((pwOff ? 'Tuần trước' : 'Tuần này') + ' chưa học. Nhắc con học 10 phút mỗi ngày nhé.');
+    else {
+      if (lw.said && tw.said && tw.firstPct >= lw.firstPct + 0.05) notes.push('Nói chắc hơn tuần trước: đúng ngay lần đầu tăng từ ' + pct(lw.firstPct) + ' lên ' + pct(tw.firstPct) + '.');
+      if (lw.avg && tw.avg && tw.avg <= lw.avg - 0.3) notes.push('Cần ít lần thử hơn để qua một câu (' + tw.avg.toFixed(1) + ' lần, tuần trước ' + lw.avg.toFixed(1) + ').');
+      if (tw.days >= 5) notes.push('Rất chăm: học ' + tw.days + ' ngày trong tuần.');
+      else if (tw.days <= 2 && (pwOff || now.getDay() > 3)) notes.push('Mới học ' + tw.days + ' ngày, cần đều đặn hơn.');
+    }
+    const wd = wordsOf(p.id);
+    const hard = Object.entries(wd).filter(([, e]) => !e[2]).sort((a, b) => b[1][0] - a[1][0]).slice(0, 5).map(([w]) => w);
+    const wonWeek = Object.values(wd).filter(e => e[2] && e[2] >= wsKey && e[2] <= weKey).length;
+    if (wonWeek) notes.push('Chinh phục thêm ' + wonWeek + ' từ khó trong tuần.');
+    for (const n of notes) { const pn = document.createElement('p'); pn.className = 'note'; pn.textContent = n; c.append(pn); }
+    if (hard.length) {
+      const hp = document.createElement('p'); hp.className = 'note'; hp.textContent = 'Từ hay nói sai, nên kèm con: ';
+      const ch = document.createElement('div'); ch.className = 'chips'; for (const w of hard) { const s = document.createElement('span'); s.textContent = w; ch.append(s); }
+      c.append(hp, ch);
+    }
+    box.append(c);
+  }
+}
+
 /* ---------- hồ sơ + tài khoản ---------- */
 function renderWho() {
   const me = ST.profiles().find(p => p.id === PID);
@@ -2364,6 +2680,7 @@ $('addProfile').addEventListener('submit', e => {
   const p = ST.addProfile(name);
   ST.setCur(p.id); location.hash = ''; location.reload();
 });
+$('pwWeek').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; pwOff = +b.dataset.v; renderParents(); });
 $('signIn').addEventListener('click', () => window.NTSync && window.NTSync.signIn());
 $('signOut').addEventListener('click', () => window.NTSync && window.NTSync.signOut());
 $('syncNow').addEventListener('click', () => window.NTSync && window.NTSync.syncNow());

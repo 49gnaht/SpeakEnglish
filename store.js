@@ -13,7 +13,8 @@
     samples: 'speak.samples.v1' + sfx(id),
     del: 'speak.deleted.v1' + sfx(id),     // id bài đã xóa, để máy khác không thêm lại
     prefsAt: 'speak.prefsAt' + sfx(id),
-    days: 'speak.days.v1' + sfx(id)        // nhật ký học theo ngày
+    days: 'speak.days.v1' + sfx(id),       // nhật ký học theo ngày
+    words: 'speak.words.v1' + sfx(id)      // từ từng đỏ / đã chinh phục
   });
 
   function profiles() {
