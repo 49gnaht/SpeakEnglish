@@ -593,6 +593,7 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
         <label class="check"><input type="checkbox" id="loopListen"> Nút Nghe đọc lặp lại đến khi bấm Dừng, cả câu lẫn cả bài (bỏ chọn để chỉ đọc 1 lần)</label>
         <label class="check"><input type="checkbox" id="autoMic"> Nghe mẫu xong tự mở micro (khi chỉ đọc 1 lần)</label>
         <label class="check"><input type="checkbox" id="autoNext"> Nói đạt thì tự sang câu sau</label>
+        <label class="check"><input type="checkbox" id="echo"> Người học chưa biết đọc: khi nói cả bài, app đọc từng câu rồi người học nói theo (chỉ áp dụng cho hồ sơ này)</label>
         <div class="opt">
           <label class="opt-label" for="goal">Mục tiêu mỗi ngày (số câu nói đạt)</label>
           <select class="field" id="goal"><option value="5">5 câu</option><option value="10">10 câu</option><option value="15">15 câu</option><option value="20">20 câu</option><option value="30">30 câu</option></select>
@@ -1617,6 +1618,15 @@ async function toggleWhole() {
     W.timer = setInterval(renderWLive, 500);
     render(); return;
   }
+  if (P.echo) {   // bé chưa biết đọc: app đọc từng câu, bé nói theo
+    W.token++;
+    Object.assign(W, { active: true, done: false, t0: performance.now(), finals: [], cur: '', interim: '', err: null, rec: null, withRec: false, retried: false, echo: true, si: 0, retry: false, prev: null, phase: '' });
+    W.timer = setInterval(renderWLive, 500);
+    render();
+    echoStep(W.token);
+    return;
+  }
+  W.echo = false;
   let withRec = !P.noConcurrent;
   if (withRec) {
     try { withRec = await startRecorder(); }
@@ -1663,7 +1673,50 @@ function wholeSession(tok) {
   };
   try { r.start(); } catch { W.err = 'start'; finishWhole(); }
 }
+/* nghe – nói theo cả bài: đọc câu, bé nhắc lại, sang câu sau; câu chưa đạt thì đọc lại 1 lần */
+function echoStep(tok) {
+  if (tok !== W.token || !W.active) return;
+  if (W.si >= L.items.length) { W.active = false; finishWhole(); return; }
+  playIdx = W.si; markNow();
+  const el = $('whole').querySelector('.s.now'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+  W.phase = 'listen'; renderWLive();
+  speakText(L.items[W.si].en, () => {
+    if (tok !== W.token || !W.active) return;
+    W.phase = 'say'; renderWLive();
+    echoListen(tok);
+  });
+}
+function echoListen(tok) {
+  let r;
+  try { r = new SR(); } catch { W.err = 'start'; W.active = false; finishWhole(); return; }
+  W.rec = r;
+  r.lang = 'en-US'; r.interimResults = true; r.maxAlternatives = 1; r.continuous = false;
+  let fin = '', interim = '';
+  r.onresult = e => {
+    interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) fin += ' ' + e.results[i][0].transcript; else interim += e.results[i][0].transcript;
+    }
+    W.cur = (fin + ' ' + interim).trim();
+    W.live = evaluateWhole(heardSoFar()).marks; renderWhole(); renderWLive();
+  };
+  r.onerror = e => { if (FATAL.includes(e.error)) W.err = e.error; };
+  r.onend = () => {
+    if (tok !== W.token) return;
+    W.rec = null; W.cur = '';
+    const text = (fin.trim() || interim.trim());
+    if (W.err || !W.active) { if (text) W.finals.push(text); W.active = false; finishWhole(); return; }
+    const sc = text ? evaluate(L.items[W.si].en, [text], isKid()).score : 0;
+    const best = W.prev && W.prev.sc > sc ? W.prev : { text, sc };
+    if (sc < passFor(L) && !W.retry) { W.retry = true; W.prev = best; echoStep(tok); return; }   // đọc lại câu này 1 lần
+    if (best.text) W.finals.push(best.text);
+    W.si++; W.retry = false; W.prev = null;
+    echoStep(tok);
+  };
+  try { r.start(); } catch { W.err = 'start'; W.active = false; finishWhole(); }
+}
 function stopWhole() {
+  if (W.echo && !W.rec) { W.active = false; stopSpeaking(); finishWhole(); return; }
   W.active = false;
   if (W.rec) { try { W.rec.stop(); } catch { finishWhole(); } }
   else finishWhole();
@@ -1678,6 +1731,7 @@ async function finishWhole() {
   if (W.done) return;
   W.done = true; W.active = false; W.rec = null;
   clearInterval(W.timer); W.timer = null;
+  if (W.echo) { playIdx = -1; markNow(); }
   const secs = (performance.now() - W.t0) / 1000;
   const blob = await stopRecorder(true);
   const heard = heardSoFar();
@@ -1700,11 +1754,11 @@ async function finishWhole() {
   }
   const r = evaluateWhole(heard);
   r.secs = secs;
-  r.wpm = secs > 3 ? Math.round(normWords(heard).length / (secs / 60)) : 0;
+  r.wpm = W.echo ? 0 : secs > 3 ? Math.round(normWords(heard).length / (secs / 60)) : 0;
   W.result = r; W.live = null;
   const wasDone = inSeq(L) && isDone(L);
   if (L.firstWhole == null) L.firstWhole = (L.whole && L.whole[0] ? L.whole[0].score : Math.floor(r.score * 1000) / 1000);
-  L.whole = (L.whole || []).concat({ ts: Date.now(), score: Math.floor(r.score * 1000) / 1000, secs: Math.round(secs), wpm: r.wpm, level: P.level }).slice(-20);
+  L.whole = (L.whole || []).concat({ ts: Date.now(), score: Math.floor(r.score * 1000) / 1000, secs: Math.round(secs), wpm: r.wpm, level: P.level, ...(W.echo ? { echo: 1 } : {}) }).slice(-20);
   if (inSeq(L) && !wasDone && isDone(L)) L.justDone = true;
   putLesson(L);
   logWords(L.items.flatMap((it, si) => tokens(it.en).map((t, k) => [t.subs.join(' '), r.marks[si] ? r.marks[si][k] : null])));
@@ -1725,6 +1779,11 @@ function renderWLive() {
   const secs = (performance.now() - W.t0) / 1000;
   const words = (heardSoFar() + ' ' + W.interim).trim().split(/\s+/).filter(Boolean);
   const tail = words.slice(-14).join(' ');
+  if (W.echo) {
+    const n = L ? L.items.length : 0, k = Math.min(W.si + 1, n);
+    $('wLive').textContent = fmtTime(secs) + '  Câu ' + k + '/' + n + ': ' + (W.phase === 'say' ? (W.retry ? 'nói lại nào…' : 'đến lượt bé nói…') : (W.retry ? 'nghe lại câu này…' : 'nghe…'));
+    return;
+  }
   $('wLive').textContent = fmtTime(secs) + (SR ? (tail ? '  …' + tail : '  Đang nghe, bạn đọc đi.') : '  Đang thu. Đọc xong bấm Xong.');
 }
 function fmtTime(secs) {
@@ -1906,7 +1965,7 @@ function renderDock() {
   $('listenText').textContent = playingNow ? 'Dừng' : (whole ? 'Nghe cả bài' : 'Nghe');
   const on = whole ? W.active : listening;
   $('speak').setAttribute('aria-pressed', String(on));
-  $('speakText').textContent = on ? 'Xong' : (whole ? 'Nói cả bài' : 'Nói');
+  $('speakText').textContent = on ? 'Xong' : (whole ? (P.echo && SR ? 'Nói theo cả bài' : 'Nói cả bài') : 'Nói');
   $('prev').hidden = whole; $('next').hidden = whole;
   $('dockIn').classList.toggle('two', whole);
   if (L && !whole) { $('prev').disabled = nextIndex(-1) === idx || idx === 0; $('next').disabled = nextIndex(1) === idx || idx >= L.items.length - 1; }
@@ -1945,7 +2004,8 @@ function renderWResult() {
   box.classList.toggle('pass', pass); box.classList.toggle('fail', !pass);
   const pct = Math.round(r.score * 100);
   $('wBadge').textContent = isKid()
-    ? (pass ? 'Giỏi quá! Bé đọc cả bài đúng ' + pct + '%.' : 'Bé đọc hết cả bài rồi, đúng ' + pct + '%. Luyện thêm vài câu là giỏi hơn nữa!')
+    ? (W.echo ? (pass ? 'Giỏi quá! Bé nói theo cả bài đúng ' + pct + '%.' : 'Bé nói theo hết cả bài rồi, đúng ' + pct + '%. Luyện thêm vài câu là giỏi hơn nữa!')
+      : pass ? 'Giỏi quá! Bé đọc cả bài đúng ' + pct + '%.' : 'Bé đọc hết cả bài rồi, đúng ' + pct + '%. Luyện thêm vài câu là giỏi hơn nữa!')
     : 'Đúng ' + r.hits + '/' + r.total + ' từ (' + pct + '%).' + (pass ? ' Tốt lắm.' : '');
   let stats = 'Thời gian ' + fmtLen(r.secs) + '.';
   if (r.wpm) {
@@ -1983,7 +2043,7 @@ function render() {
   $('pos').textContent = pos;
   $('clearQueue').hidden = !queue;
   setSeg('level', P.level); setSeg('viMode', P.showVi ? 1 : 0); setSeg('rate', P.rate);
-  $('goal').value = String(P.goal || 10); $('autoMic').checked = P.autoMic; $('autoNext').checked = P.autoNext; $('loopListen').checked = P.loopListen;
+  $('goal').value = String(P.goal || 10); $('echo').checked = !!P.echo; $('autoMic').checked = P.autoMic; $('autoNext').checked = P.autoNext; $('loopListen').checked = P.loopListen;
   $('autoMic').disabled = P.loopListen;
   if (P.mode === 1) { renderWhole(); renderWResult(); renderWLast(); }
   else { renderSentence(); renderResult(); renderDots(); }
@@ -2094,12 +2154,19 @@ function renderGate() {
     }
   } else if (sentencesDone(L)) {
     const pct = Math.round(wholeNeed(L) * 100);
-    p.textContent = 'Còn một bước nữa: nói cả bài đúng từ ' + pct + '% để mở bài tiếp theo.';
+    p.textContent = P.echo
+      ? 'Còn một bước nữa: nghe và nói theo cả bài, đúng từ ' + pct + '% để mở bài tiếp theo.'
+      : 'Còn một bước nữa: nói cả bài đúng từ ' + pct + '% để mở bài tiếp theo.';
     g.append(p);
     if (P.mode !== 1) {
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn primary small'; b.textContent = 'Nói cả bài';
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn primary small'; b.textContent = P.echo ? 'Nói theo cả bài' : 'Nói cả bài';
       b.addEventListener('click', () => $('mode').querySelector('[data-v="1"]').click());
       g.append(b);
+    }
+    if (isKid() && !P.echo && SR) {
+      const q = document.createElement('button'); q.type = 'button'; q.className = 'link small'; q.textContent = 'Bé chưa đọc được cả đoạn? Bật nghe – nói theo';
+      q.addEventListener('click', () => { P.echo = true; savePrefs(); $('echo').checked = true; renderGate(); render(); say('Đã bật cho hồ sơ này: khi nói cả bài, app đọc từng câu và bé nói theo.'); });
+      g.append(q);
     }
   } else { g.hidden = true; return; }
   g.hidden = false;
@@ -2145,7 +2212,7 @@ function route() {
       show('practice');
       go(Math.min(L.last || 0, L.items.length - 1));
       if (P.mode !== 1) $('mode').querySelector('[data-v="1"]').click();
-      say('Ôn bài cũ: nghe lại một lượt nếu cần, rồi bấm Nói cả bài. Đạt ' + Math.round(wholeNeed(l) * 100) + '% là xong.', true);
+      say('Ôn bài cũ: ' + (P.echo ? 'bấm Nói theo cả bài, nghe từng câu rồi nói theo' : 'nghe lại một lượt nếu cần, rồi bấm Nói cả bài') + '. Đạt ' + Math.round(wholeNeed(l) * 100) + '% là xong.', true);
       return;
     }
   }
@@ -2279,6 +2346,7 @@ $('loopListen').addEventListener('change', e => {
 $('autoNext').addEventListener('change', e => { P.autoNext = e.target.checked; savePrefs(); if (!P.autoNext) clearTimeout(nextTimer); renderResult(); });
 $('voice').addEventListener('change', e => { P.voice = e.target.value; savePrefs(); });
 $('goal').addEventListener('change', e => { P.goal = +e.target.value || 10; savePrefs(); });
+$('echo').addEventListener('change', e => { P.echo = e.target.checked; savePrefs(); renderGate(); render(); });
 $('recOnly').addEventListener('click', toggleSelfRec);
 $('askAi').addEventListener('click', askGemini);
 $('aiCopy').addEventListener('click', async () => {
