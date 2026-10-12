@@ -12,7 +12,8 @@
     prefs: 'speak.prefs.v2' + sfx(id),
     samples: 'speak.samples.v1' + sfx(id),
     del: 'speak.deleted.v1' + sfx(id),     // id bài đã xóa, để máy khác không thêm lại
-    prefsAt: 'speak.prefsAt' + sfx(id)
+    prefsAt: 'speak.prefsAt' + sfx(id),
+    days: 'speak.days.v1' + sfx(id)        // nhật ký học theo ngày
   });
 
   function profiles() {

@@ -253,6 +253,21 @@ select.field { height: 44px; padding: 0 10px; }
 .profiles li.on { border-color: var(--accent); }
 .profiles .pick { text-align: left; background: none; border: 0; padding: 0; font: inherit; font-weight: 600; cursor: pointer; color: var(--ink); overflow-wrap: anywhere; }
 .grow { flex: 1 1 160px; min-width: 0; }
+.today { display: grid; gap: 6px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.today .meter.goal { height: 8px; border-radius: 4px; margin: 2px 0 0; }
+.today.won { border-color: var(--good); background: var(--good-bg); }
+.today p { margin: 0; }
+.td-main { font-size: var(--t-xs); color: var(--muted); }
+.td-praise { font-weight: 600; }
+.td-praise:empty { display: none; }
+.streak { font-weight: 700; font-variant-numeric: tabular-nums; }
+.cal-wrap summary { cursor: pointer; font-size: var(--t-xs); color: var(--muted); }
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 8px 0 6px; text-align: center; }
+.cal span { display: grid; place-items: center; min-height: 38px; border-radius: 8px; font-size: 12px; line-height: 1.1; color: var(--muted); background: var(--bg); }
+.cal span.h { background: none; font-weight: 600; min-height: 20px; }
+.cal span.ok { background: var(--good-bg); color: var(--ink); box-shadow: inset 0 0 0 1px var(--good); }
+.cal span.now { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cal span i { font-style: normal; font-size: 14px; }
 .acct b { font-size: var(--t-sm, 16px); }
 .lock-note { font-size: var(--t-xs); color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .keys { font-size: var(--t-xs); color: var(--muted); }
@@ -276,6 +291,17 @@ select.field { height: 44px; padding: 0 10px; }
       <a class="btn primary" href="#moi">Tạo bài mới</a>
     </div>
     <a class="who" id="who" href="#hoso"></a>
+    <section class="today" id="today" aria-labelledby="tdHead">
+      <div class="spread"><b id="tdHead">Hôm nay</b><span class="streak" id="tdStreak"></span></div>
+      <div class="meter goal"><i id="tdBar"></i></div>
+      <p class="td-main" id="tdText"></p>
+      <p class="td-praise" id="tdPraise"></p>
+      <details class="cal-wrap" id="calWrap">
+        <summary>Lịch học tháng này</summary>
+        <div class="cal" id="calGrid"></div>
+        <p class="hint">⭐ đạt mục tiêu · • có luyện · 💤 ngày nghỉ phép (mỗi tuần được nghỉ 1 ngày mà chuỗi không đứt)</p>
+      </details>
+    </section>
     <div class="seg groups" id="groupTabs" role="group" aria-label="Nhóm bài">
       <button type="button" data-v="0">Người lớn</button>
       <button type="button" data-v="1">Trẻ em</button>
@@ -449,6 +475,10 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
         <label class="check"><input type="checkbox" id="loopListen"> Nút Nghe đọc lặp lại đến khi bấm Dừng, cả câu lẫn cả bài (bỏ chọn để chỉ đọc 1 lần)</label>
         <label class="check"><input type="checkbox" id="autoMic"> Nghe mẫu xong tự mở micro (khi chỉ đọc 1 lần)</label>
         <label class="check"><input type="checkbox" id="autoNext"> Nói đạt thì tự sang câu sau</label>
+        <div class="opt">
+          <label class="opt-label" for="goal">Mục tiêu mỗi ngày (số câu nói đạt)</label>
+          <select class="field" id="goal"><option value="5">5 câu</option><option value="10">10 câu</option><option value="15">15 câu</option><option value="20">20 câu</option><option value="30">30 câu</option></select>
+        </div>
         <div class="opt">
           <label class="opt-label" for="voice">Giọng đọc mẫu</label>
           <select class="field" id="voice"></select>
@@ -851,7 +881,7 @@ const KID_ORDER = ['mau-sunny-day', 'mau-bedtime-story', 'mau-my-favorite-toy', 
 const ADULT_ORDER = SAMPLES.filter(x => x.group === 0).map(x => x.id);
 const DAILY_NEW = 4;                 // mỗi ngày tối đa 4 bài mới (bài có thứ tự)
 
-const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: false, autoNext: false, loopListen: true, mode: 0, group: 0, noConcurrent: IS_ANDROID, silent: 0 };
+const P = { level: 0, showVi: false, rate: 0.9, voice: '', autoMic: false, autoNext: false, loopListen: true, mode: 0, group: 0, noConcurrent: IS_ANDROID, silent: 0, goal: 10 };
 let L = null, idx = 0;
 let peek = false, viOne = false, result = null, selfCheck = false;
 let msgTimer = null, nextTimer = null, queue = null;
@@ -1556,7 +1586,9 @@ async function finishWhole() {
   L.whole = (L.whole || []).concat({ ts: Date.now(), score: Math.floor(r.score * 1000) / 1000, secs: Math.round(secs), wpm: r.wpm, level: P.level }).slice(-20);
   if (inSeq(L) && !wasDone && isDone(L)) L.justDone = true;
   putLesson(L);
+  const goalHit = logWhole(L, r.score);
   render();
+  if (goalHit) goalReached();
   const box = $('wResult');
   if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' });
   if ((isKid() && r.score >= 0.75) || L.justDone) celebrate($('whole').closest('.card'));
@@ -1640,7 +1672,10 @@ function finish(r) {
   const best = L.best[idx] || 0;
   if (eff > best) L.best[idx] = Math.floor(eff * 1000) / 1000;
   putLesson(L);
+  const red = tokens(L.items[idx].en).filter((t, k) => r.marks[k] === false).map(t => t.subs.join(' '));
+  const goalHit = logSentence(L, idx, passed, red);
   render();
+  if (goalHit) goalReached();
   if (passed && isKid()) celebrate($('sent').closest('.card'));
   if (inSeq(L) && !wasDone && isDone(L)) { L.justDone = true; putLesson(L); renderGate(); }
   if (passed && P.autoNext) {
@@ -1818,7 +1853,7 @@ function render() {
   $('pos').textContent = pos;
   $('clearQueue').hidden = !queue;
   setSeg('level', P.level); setSeg('viMode', P.showVi ? 1 : 0); setSeg('rate', P.rate);
-  $('autoMic').checked = P.autoMic; $('autoNext').checked = P.autoNext; $('loopListen').checked = P.loopListen;
+  $('goal').value = String(P.goal || 10); $('autoMic').checked = P.autoMic; $('autoNext').checked = P.autoNext; $('loopListen').checked = P.loopListen;
   $('autoMic').disabled = P.loopListen;
   if (P.mode === 1) { renderWhole(); renderWResult(); renderWLast(); }
   else { renderSentence(); renderResult(); renderDots(); }
@@ -1826,6 +1861,7 @@ function render() {
 }
 
 function renderList() {
+  renderToday();
   const everything = lessons(), ul = $('lessonList');
   const all = sortForList(everything.filter(l => groupOf(l) === P.group));
   $('orderOpt').hidden = P.group !== 0; $('adultOrder').checked = !!P.adultOrder;
@@ -2093,6 +2129,7 @@ $('loopListen').addEventListener('change', e => {
 });
 $('autoNext').addEventListener('change', e => { P.autoNext = e.target.checked; savePrefs(); if (!P.autoNext) clearTimeout(nextTimer); renderResult(); });
 $('voice').addEventListener('change', e => { P.voice = e.target.value; savePrefs(); });
+$('goal').addEventListener('change', e => { P.goal = +e.target.value || 10; savePrefs(); });
 $('recOnly').addEventListener('click', toggleSelfRec);
 $('askAi').addEventListener('click', askGemini);
 $('aiCopy').addEventListener('click', async () => {
@@ -2138,6 +2175,125 @@ document.addEventListener('keydown', e => {
   }
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopAll(), renderDock(); });
+
+/* ---------- nhật ký học, mục tiêu ngày, chuỗi ngày ---------- */
+// mỗi ngày: { sec, s: { 'bài|câu': [số lần thử, đạt ở lần thứ (0 = chưa)] }, wl: { bài: số câu } (nói cả bài đạt), w, wb, red: { từ: lần }, ok }
+const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+function days() { try { const v = JSON.parse(localStorage.getItem(K.days)); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } }
+function writeDays(d, quiet) {
+  const ks = Object.keys(d).sort();
+  while (ks.length > 400) delete d[ks.shift()];
+  try { localStorage.setItem(K.days, JSON.stringify(d)); } catch {}
+  if (!quiet) ST.changed(PID);
+}
+function dayRec(d, k) { k = k || today(); return d[k] || (d[k] = { sec: 0, s: {}, w: 0, wb: 0, red: {} }); }
+function dayStats(r) {
+  const z = { said: 0, first: 0, passed: 0, avg: 0, sec: 0, w: 0, ok: false };
+  if (!r) return z;
+  const keys = Object.keys(r.s || {});
+  const done = new Set(keys.filter(k => r.s[k][1]));
+  for (const [id, n] of Object.entries(r.wl || {})) for (let i = 0; i < n; i++) done.add(id + '|' + i);
+  const at = keys.map(k => r.s[k][1]).filter(Boolean);
+  return {
+    said: keys.length, first: at.filter(x => x === 1).length, passed: done.size,
+    avg: at.length ? at.reduce((a, b) => a + b, 0) / at.length : 0,
+    sec: r.sec || 0, w: r.w || 0, ok: !!r.ok
+  };
+}
+function markGoal(r) {
+  if (r.ok || dayStats(r).passed < (P.goal || 10)) return false;
+  r.ok = 1; return true;
+}
+function logSentence(l, i, passed, red) {
+  const d = days(), r = dayRec(d), key = l.id + '|' + i;
+  const e = r.s[key] || [0, 0];
+  if (!e[1]) { e[0]++; if (passed) e[1] = e[0]; }
+  r.s[key] = e;
+  r.red = r.red || {};
+  for (const w of red || []) if (w) r.red[w] = (r.red[w] || 0) + 1;
+  const hit = markGoal(r);
+  writeDays(d);
+  return hit;
+}
+function logWhole(l, score) {
+  const d = days(), r = dayRec(d);
+  r.w = (r.w || 0) + 1; r.wb = Math.max(r.wb || 0, Math.floor(score * 1000) / 1000);
+  if (score >= wholeNeed(l)) { r.wl = r.wl || {}; r.wl[l.id] = l.items.length; }
+  const hit = markGoal(r);
+  writeDays(d);
+  return hit;
+}
+function goalReached() {
+  celebrate(document.querySelector('#practice .card'));
+  say('Đạt mục tiêu hôm nay: ' + (P.goal || 10) + ' câu! Được thêm một ngôi sao trên lịch ⭐');
+}
+// chuỗi ngày đạt mục tiêu; mỗi 7 ngày được nghỉ 1 ngày mà chuỗi không đứt
+function streakInfo(d) {
+  let n = 0, freezeAt = -99, lastOk = -1;
+  const rest = [], dt = new Date();
+  for (let k = 0; k < 400; k++) {
+    const key = ymd(dt), r = d[key];
+    if (r && r.ok) { n++; lastOk = k; }
+    else if (k === 0) { /* hôm nay chưa xong: chưa tính là nghỉ */ }
+    else if (k - freezeAt >= 7) { freezeAt = k; rest.push([k, key]); }
+    else break;
+    dt.setDate(dt.getDate() - 1);
+  }
+  // chỉ tính là nghỉ phép khi nằm giữa chuỗi (trước đó còn ngày đạt)
+  return { n, frozen: new Set(rest.filter(([k]) => k < lastOk).map(([, key]) => key)) };
+}
+// thời gian luyện: cộng dần khi đang ở màn luyện, màn hình bật và vừa thao tác trong 1 phút
+let lastAct = Date.now();
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { lastAct = Date.now(); }, { passive: true }));
+setInterval(() => {
+  if (document.hidden || $('practice').hidden || Date.now() - lastAct > 60000) return;
+  const d = days(); const r = dayRec(d); r.sec = (r.sec || 0) + 10; writeDays(d, true);
+}, 10000);
+
+function praiseFor(t, prev, st) {
+  const goal = P.goal || 10;
+  if (prev && t.said >= 3) {
+    if (t.first > prev.first) return 'Đúng ngay lần đầu ' + t.first + ' câu, nhiều hơn lần trước ' + (t.first - prev.first) + ' câu!';
+    if (t.avg && prev.avg && t.avg <= prev.avg - 0.3) return 'Tiến bộ rồi: trung bình ' + t.avg.toFixed(1) + ' lần là qua một câu (lần trước ' + prev.avg.toFixed(1) + ' lần).';
+  }
+  if (t.ok && [3, 5, 7, 10, 14, 21, 30, 50, 100].includes(st.n)) return 'Chuỗi ' + st.n + ' ngày liên tục, giỏi quá!';
+  if (t.ok) return 'Xong mục tiêu hôm nay rồi, tuyệt vời!';
+  if (prev && t.passed > prev.passed) return 'Đã đạt nhiều câu hơn lần trước. Còn ' + (goal - t.passed) + ' câu nữa là xong mục tiêu!';
+  if (t.said) return 'Còn ' + (goal - t.passed) + ' câu nữa là xong mục tiêu hôm nay. Cố lên!';
+  if (st.n) return 'Nói đạt ' + goal + ' câu hôm nay để giữ chuỗi ' + st.n + ' ngày nhé!';
+  return 'Mỗi ngày ' + goal + ' câu thôi, bắt đầu nào!';
+}
+function renderToday() {
+  const d = days(), key = today(), t = dayStats(d[key]), st = streakInfo(d), goal = P.goal || 10;
+  const prevKey = Object.keys(d).filter(k => k < key && dayStats(d[k]).said > 0).sort().pop();
+  const prev = prevKey ? dayStats(d[prevKey]) : null;
+  $('today').classList.toggle('won', t.ok);
+  $('tdHead').textContent = 'Hôm nay: ' + Math.min(t.passed, 999) + '/' + goal + ' câu đạt';
+  $('tdStreak').textContent = st.n ? '🔥 ' + st.n + ' ngày' : '';
+  $('tdBar').style.width = Math.min(100, t.passed / goal * 100) + '%';
+  const bits = [];
+  if (t.said) bits.push('đã nói ' + t.said + ' câu', t.first + ' câu đúng ngay lần đầu');
+  if (t.w) bits.push(t.w + ' lần nói cả bài');
+  if (t.sec >= 60) bits.push(Math.round(t.sec / 60) + ' phút luyện');
+  $('tdText').textContent = bits.length ? bits.join(' · ').replace(/^./, c => c.toUpperCase()) : 'Chưa luyện hôm nay.';
+  $('tdPraise').textContent = praiseFor(t, prev, st);
+  // lịch tháng
+  const g = $('calGrid'); g.textContent = '';
+  for (const h of ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']) { const c = document.createElement('span'); c.className = 'h'; c.textContent = h; g.append(c); }
+  const now = new Date(), first = new Date(now.getFullYear(), now.getMonth(), 1);
+  for (let k = 0; k < (first.getDay() + 6) % 7; k++) { const c = document.createElement('span'); c.className = 'h'; g.append(c); }
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  for (let day = 1; day <= last; day++) {
+    const dk = ymd(new Date(now.getFullYear(), now.getMonth(), day)), s = dayStats(d[dk]);
+    const c = document.createElement('span');
+    const mark = s.ok ? '⭐' : st.frozen.has(dk) && dk < key ? '💤' : s.said ? '•' : '';
+    if (s.ok) c.classList.add('ok');
+    if (dk === key) c.classList.add('now');
+    c.append(String(day));
+    if (mark) { const i = document.createElement('i'); i.textContent = mark; c.append(document.createElement('br'), i); }
+    g.append(c);
+  }
+}
 
 /* ---------- hồ sơ + tài khoản ---------- */
 function renderWho() {
