@@ -66,7 +66,8 @@ function readLocal(pid) {
     samples: S.json(k.samples, null),
     deleted: S.json(k.del, []),
     days: S.json(k.days, null),
-    words: S.json(k.words, null)
+    words: S.json(k.words, null),
+    badges: S.json(k.badges, null)
   };
 }
 function writeLocal(pid, d) {
@@ -78,6 +79,7 @@ function writeLocal(pid, d) {
   S.set(k.del, JSON.stringify(d.deleted || []));
   if (d.days) S.set(k.days, JSON.stringify(d.days));
   if (d.words) S.set(k.words, JSON.stringify(d.words));
+  if (d.badges) S.set(k.badges, JSON.stringify(d.badges));
 }
 // nhật ký theo ngày: gộp từng ngày, lấy giá trị lớn hơn (học trên 2 máy cùng ngày thì cộng dồn số câu)
 function mergeDay(a, b) {
@@ -108,6 +110,12 @@ function mergeWords(a, b) {
   }
   return r;
 }
+function mergeBadges(a, b) {
+  if (!a || !b) return a || b || null;
+  const r = { ...a };
+  for (const [id, d] of Object.entries(b)) if (!r[id] || d < r[id]) r[id] = d;
+  return r;
+}
 function mergeDays(a, b) {
   if (!a || !b) return a || b || null;
   const r = { ...a };
@@ -124,14 +132,16 @@ function mergeProfile(loc, rem) {
     samples: loc.samples || rem.samples ? union(loc.samples, rem.samples) : null,
     deleted,
     days: mergeDays(loc.days, rem.days),
-    words: mergeWords(loc.words, rem.words)
+    words: mergeWords(loc.words, rem.words),
+    badges: mergeBadges(loc.badges, rem.badges)
   };
 }
 const pack = d => ({
   lessons: JSON.stringify(d.lessons || null), prefs: JSON.stringify(d.prefs || null),
   prefsAt: d.prefsAt || 0, samples: JSON.stringify(d.samples || null), deleted: JSON.stringify(d.deleted || []),
   days: JSON.stringify(d.days || null),
-  words: JSON.stringify(d.words || null)
+  words: JSON.stringify(d.words || null),
+  badges: JSON.stringify(d.badges || null)
 });
 
 /* ---------- đồng bộ ---------- */
@@ -142,14 +152,14 @@ async function syncProfile(uid, pid) {
   const raw = snap.exists() ? snap.data() : {};
   const rem = {
     lessons: parse(raw.lessons, null), prefs: parse(raw.prefs, null), prefsAt: raw.prefsAt || 0,
-    samples: parse(raw.samples, null), deleted: parse(raw.deleted, []), days: parse(raw.days, null), words: parse(raw.words, null)
+    samples: parse(raw.samples, null), deleted: parse(raw.deleted, []), days: parse(raw.days, null), words: parse(raw.words, null), badges: parse(raw.badges, null)
   };
   const loc = readLocal(pid);
   const merged = mergeProfile(loc, rem);
   const p = pack(merged), before = pack(loc);
-  const localChanged = ['lessons', 'prefs', 'samples', 'deleted', 'days', 'words'].some(k => p[k] !== before[k]);
+  const localChanged = ['lessons', 'prefs', 'samples', 'deleted', 'days', 'words', 'badges'].some(k => p[k] !== before[k]);
   if (localChanged) { applying = true; writeLocal(pid, merged); applying = false; }
-  const remoteSame = snap.exists() && ['lessons', 'prefs', 'samples', 'deleted', 'days', 'words'].every(k => p[k] === raw[k]) && p.prefsAt === raw.prefsAt;
+  const remoteSame = snap.exists() && ['lessons', 'prefs', 'samples', 'deleted', 'days', 'words', 'badges'].every(k => p[k] === raw[k]) && p.prefsAt === raw.prefsAt;
   if (!remoteSame) await setDoc(ref, { ...p, updated: Date.now() });
   return localChanged;
 }

@@ -306,6 +306,20 @@ select.field { height: 44px; padding: 0 10px; }
 .pcard dt { color: var(--muted); white-space: nowrap; }
 .pcard dd { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .pcard .note { margin: 0; font-size: var(--t-xs); }
+.review { display: grid; gap: 8px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--accent); background: var(--surface); }
+.review p { margin: 0; }
+.tag.due { border-color: var(--accent); color: var(--accent); }
+.ba { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.bdg { display: grid; justify-items: center; gap: 2px; padding: 10px 6px; border-radius: 12px; background: var(--bg); text-align: center; font-size: 12px; line-height: 1.3; }
+.bdg i { font-style: normal; font-size: 28px; line-height: 1.2; }
+.bdg b { font-weight: 600; }
+.bdg small { color: var(--muted); font-size: 11px; }
+.bdg.got { background: var(--good-bg); }
+.bdg:not(.got) i { filter: grayscale(1); opacity: 0.35; }
+.clips { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.clips li { display: grid; gap: 6px; }
+.clips .en { font-weight: 500; overflow-wrap: anywhere; }
 .acct b { font-size: var(--t-sm, 16px); }
 .lock-note { font-size: var(--t-xs); color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .keys { font-size: var(--t-xs); color: var(--muted); }
@@ -347,6 +361,11 @@ select.field { height: 44px; padding: 0 10px; }
     </div>
     <label class="check" id="orderOpt" hidden><input type="checkbox" id="adultOrder"> Học bài mẫu theo thứ tự (qua bài trước mới mở bài sau)</label>
     <p class="hint" id="kidRule" hidden>Bài mẫu trẻ em mở lần lượt: đọc đạt hết các câu và nói cả bài đạt 70% thì mở bài tiếp theo. Mỗi ngày học tối đa 4 bài mới.</p>
+    <section class="review" id="reviewBox" hidden>
+      <b>Ôn bài cũ</b>
+      <p class="hint">Bài đã qua từ một tuần trước. Nói lại cả bài để nhớ lâu hơn.</p>
+      <div class="row" id="reviewList"></div>
+    </section>
     <ul class="list" id="lessonList"></ul>
     <p class="hint" id="noLessons" hidden></p>
     <section class="guide" aria-labelledby="guideHead">
@@ -405,6 +424,15 @@ select.field { height: 44px; padding: 0 10px; }
       <h2>Điểm nói cả bài</h2>
       <p class="hint">Mỗi chấm là một lần nói cả bài, từ trái sang phải theo thời gian.</p>
       <ul class="wholes" id="stWhole"></ul>
+    </section>
+    <section class="panel">
+      <h2>Huy hiệu</h2>
+      <div class="badges" id="stBadges"></div>
+    </section>
+    <section class="panel" id="stClipsBox">
+      <h2>Nghe lại mình: trước và sau</h2>
+      <p class="hint">Bản thu lần đầu và lần nói đạt gần nhất, lưu trên máy này.</p>
+      <ul class="clips" id="stClips"></ul>
     </section>
     <section class="panel">
       <h2>Từ đã chinh phục</h2>
@@ -534,6 +562,11 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
         <button class="btn rec" type="button" id="recOnly" aria-pressed="false" hidden><span class="dot" aria-hidden="true"></span><span id="recOnlyText">Thu âm</span></button>
         <button class="btn" type="button" id="playBack" hidden>Nghe lại giọng mình</button>
         <button class="btn" type="button" id="askAi" hidden>Nhờ Gemini nhận xét</button>
+      </div>
+      <div class="ba" id="ba" hidden>
+        <span class="hint">Nghe lại mình:</span>
+        <button class="btn small" type="button" data-ba="first" id="baFirst"></button>
+        <button class="btn small" type="button" data-ba="last" id="baLast"></button>
       </div>
       <div class="ai" id="aiBox" hidden>
         <p id="aiHint"></p>
@@ -979,6 +1012,7 @@ function writeLessons(all) { try { localStorage.setItem(KEY, JSON.stringify(all)
 function putLesson(l) {
   const all = lessons(), i = all.findIndex(x => x.id === l.id);
   l.mod = Date.now();
+  if (!l.doneAt && l.items && isDone(l)) { l.doneAt = today(); l.rev = { due: plusDays(REVIEW_GAPS[0]), n: 0 }; }
   const { justDone, ...keep } = l;   // trạng thái tạm, không lưu
   if (i >= 0) all[i] = keep; else all.unshift(keep);
   writeLessons(all);
@@ -1515,6 +1549,7 @@ function listen(withRec, retried) {
     } else if (blob) {
       if (P.silent) { P.silent = 0; savePrefs(); }
       setBack(blob);
+      clipBlob = blob;
     }
     const cands = [heard];
     if (alts.length === 1 && alts[0]) cands.push(...alts[0].slice(1));
@@ -1649,7 +1684,7 @@ async function finishWhole() {
   $('wLive').textContent = '';
   if (blob) {
     if (SR && heard && mrPeak < 0.01) { P.silent = (P.silent || 0) + 1; if (P.silent >= 2) P.noConcurrent = true; savePrefs(); }
-    else setBack(blob);
+    else { setBack(blob); clipBlob = blob; }
   }
   if (!SR) { W.peek = true; render(); return; }
   if (!heard) {
@@ -1668,16 +1703,21 @@ async function finishWhole() {
   r.wpm = secs > 3 ? Math.round(normWords(heard).length / (secs / 60)) : 0;
   W.result = r; W.live = null;
   const wasDone = inSeq(L) && isDone(L);
+  if (L.firstWhole == null) L.firstWhole = (L.whole && L.whole[0] ? L.whole[0].score : Math.floor(r.score * 1000) / 1000);
   L.whole = (L.whole || []).concat({ ts: Date.now(), score: Math.floor(r.score * 1000) / 1000, secs: Math.round(secs), wpm: r.wpm, level: P.level }).slice(-20);
   if (inSeq(L) && !wasDone && isDone(L)) L.justDone = true;
   putLesson(L);
   logWords(L.items.flatMap((it, si) => tokens(it.en).map((t, k) => [t.subs.join(' '), r.marks[si] ? r.marks[si][k] : null])));
   const goalHit = logWhole(L, r.score);
+  if (clipBlob) { saveClip(L.id, 'w', clipBlob, r.score, r.score >= wholeNeed(L)); clipBlob = null; }
+  const rv = reviewing === L.id ? finishReview(L, r.score) : null;
   render();
   if (goalHit) goalReached();
+  if (rv) say(rv, true);
+  awardBadges();
   const box = $('wResult');
   if (box.scrollIntoView) box.scrollIntoView({ block: 'nearest' });
-  if ((isKid() && r.score >= 0.75) || L.justDone) celebrate($('whole').closest('.card'));
+  if ((isKid() && r.score >= 0.75) || L.justDone || (rv && r.score >= wholeNeed(L))) celebrate($('whole').closest('.card'));
   if (L.justDone) { const g = $('gate'); if (g.scrollIntoView) g.scrollIntoView({ block: 'nearest' }); }
 }
 function renderWLive() {
@@ -1762,8 +1802,10 @@ function finish(r) {
   const red = tk.filter((t, k) => r.marks[k] === false).map(t => t.subs.join(' '));
   logWords(tk.map((t, k) => [t.subs.join(' '), r.marks[k]]));
   const goalHit = logSentence(L, idx, passed, red);
+  if (clipBlob) { saveClip(L.id, idx, clipBlob, eff, passed); clipBlob = null; }
   render();
   if (goalHit) goalReached();
+  awardBadges();
   if (passed && isKid()) celebrate($('sent').closest('.card'));
   if (inSeq(L) && !wasDone && isDone(L)) { L.justDone = true; putLesson(L); renderGate(); }
   if (passed && P.autoNext) {
@@ -1950,6 +1992,7 @@ function render() {
 
 function renderList() {
   renderToday();
+  renderReviews(lessons());
   const everything = lessons(), ul = $('lessonList');
   const all = sortForList(everything.filter(l => groupOf(l) === P.group));
   $('orderOpt').hidden = P.group !== 0; $('adultOrder').checked = !!P.adultOrder;
@@ -1970,6 +2013,7 @@ function renderList() {
     a.style.textDecoration = 'none';
     const t = document.createElement('span'); t.className = 'lesson-t'; t.textContent = l.title || 'Bài không tên';
     if (l.sample || /^mau-/.test(l.id)) { const tg = document.createElement('span'); tg.className = 'tag'; tg.textContent = 'Bài mẫu'; t.append(tg); }
+    if (l.rev && l.rev.due <= today() && isDone(l)) { const tg = document.createElement('span'); tg.className = 'tag due'; tg.textContent = 'Đến hạn ôn'; t.append(tg); }
     const lock = lockState(l, everything);
     if (inSeq(l)) {
       const tg = document.createElement('span'); tg.className = 'tag';
@@ -2078,8 +2122,9 @@ function go(i) {
   stopAll();
   idx = Math.max(0, Math.min(L.items.length - 1, i));
   peek = false; viOne = false; result = null; selfCheck = false; tries = 0; sessBestHits = -1; slowIdx = -1;
-  setBack(null); $('live').textContent = ''; say('');
+  setBack(null); clipBlob = null; $('live').textContent = ''; say('');
   L.last = idx; putLesson(L);
+  renderBA();
   render();
 }
 function show(view) {
@@ -2091,6 +2136,20 @@ function show(view) {
 function route() {
   stopAll(); say('');
   const h = decodeURIComponent(location.hash.slice(1));
+  if (h.startsWith('on=')) {
+    const l = lessons().find(x => x.id === h.slice(3));
+    if (l) {
+      L = l; L.best = L.best || {}; L.justDone = false; reviewing = l.id;
+      if (P.group !== groupOf(l)) { P.group = groupOf(l); savePrefs(); }
+      queue = null; W.result = null; W.live = null; W.peek = false;
+      show('practice');
+      go(Math.min(L.last || 0, L.items.length - 1));
+      if (P.mode !== 1) $('mode').querySelector('[data-v="1"]').click();
+      say('Ôn bài cũ: nghe lại một lượt nếu cần, rồi bấm Nói cả bài. Đạt ' + Math.round(wholeNeed(l) * 100) + '% là xong.', true);
+      return;
+    }
+  }
+  if (h.startsWith('bai=')) reviewing = null;
   if (h === 'thongke') { L = null; renderStats(); show('stats'); return; }
   if (h === 'bome') { L = null; renderParents(); show('parents'); return; }
   if (h === 'hoso') { L = null; renderAccount(); show('account'); return; }
@@ -2193,7 +2252,7 @@ $('mode').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || +b.dataset.v === P.mode) return;
   stopAll(); setBack(null); say('');
   P.mode = +b.dataset.v; savePrefs();
-  render();
+  render(); renderBA();
 });
 $('whole').addEventListener('click', e => {
   const s2 = e.target.closest('.s'); if (!s2 || W.active) return;
@@ -2540,6 +2599,177 @@ function renderStats() {
   chips($('stWon'), won.slice(0, 40), null, 'Chưa có. Từ nào bị đỏ, luyện lại đến khi xanh 2 lần là vào đây.');
   if (won.length > 40) { const s = document.createElement('span'); s.textContent = '+' + (won.length - 40) + ' từ nữa'; $('stWon').append(s); }
   chips($('stTodo'), todo, e => '×' + e[0], 'Chưa có từ nào khó.');
+  awardBadges(true); renderBadges(); renderClips();
+}
+
+/* ---------- ôn bài cũ ---------- */
+const REVIEW_GAPS = [7, 14, 30, 60];   // qua bài sau 7 ngày ôn lần 1, rồi 14, 30, 60 ngày
+let reviewing = null;
+function plusDays(n) { return ymd(addDays(new Date(), n)); }
+function dueReviews(all) { const t = today(); return all.filter(l => l.rev && l.rev.due <= t && isDone(l)).sort((a, b) => (a.rev.due < b.rev.due ? -1 : 1)); }
+function finishReview(l, score) {
+  reviewing = null;
+  const need = wholeNeed(l), first = l.firstWhole;
+  l.rev = l.rev || { n: 0 };
+  l.rev.last = { d: today(), s: Math.floor(score * 1000) / 1000 };
+  let msg;
+  if (score >= need) {
+    l.rev.n = (l.rev.n || 0) + 1;
+    const gap = REVIEW_GAPS[Math.min(l.rev.n, REVIEW_GAPS.length - 1)];
+    l.rev.due = plusDays(gap);
+    msg = 'Ôn xong, vẫn nhớ bài! Lần này ' + pct(score) + (first != null && first < score ? ', lần đầu nói cả bài chỉ ' + pct(first) : '') + '. Hẹn ôn lại sau ' + gap + ' ngày.';
+  } else {
+    l.rev.due = plusDays(2);
+    msg = 'Bài này hơi quên rồi (' + pct(score) + '). Luyện lại vài câu còn yếu rồi nói cả bài lần nữa nhé. 2 ngày nữa ôn lại.';
+  }
+  putLesson(l);
+  return msg;
+}
+function renderReviews(all) {
+  const due = dueReviews(all.filter(l => groupOf(l) === P.group));
+  $('reviewBox').hidden = !due.length;
+  const box = $('reviewList'); box.textContent = '';
+  for (const l of due.slice(0, 3)) {
+    const a = document.createElement('a'); a.className = 'btn small'; a.href = '#on=' + encodeURIComponent(l.id);
+    a.textContent = '🔁 ' + (l.title || 'Bài không tên'); box.append(a);
+  }
+  if (due.length > 3) { const s2 = document.createElement('span'); s2.className = 'hint'; s2.textContent = '+' + (due.length - 3) + ' bài nữa'; box.append(s2); }
+}
+
+/* ---------- huy hiệu ---------- */
+const BADGES = [
+  ['s10', '🌱', '10 câu đạt', 'passed', 10], ['s50', '🌿', '50 câu đạt', 'passed', 50], ['s100', '🌳', '100 câu đạt', 'passed', 100],
+  ['s250', '🏅', '250 câu đạt', 'passed', 250], ['s500', '🏆', '500 câu đạt', 'passed', 500], ['s1000', '👑', '1000 câu đạt', 'passed', 1000],
+  ['d3', '🔥', 'Chuỗi 3 ngày', 'streak', 3], ['d7', '⭐', 'Chuỗi 7 ngày', 'streak', 7], ['d14', '🌟', 'Chuỗi 14 ngày', 'streak', 14],
+  ['d30', '🚀', 'Chuỗi 30 ngày', 'streak', 30], ['d60', '💎', 'Chuỗi 60 ngày', 'streak', 60], ['d100', '🦄', 'Chuỗi 100 ngày', 'streak', 100],
+  ['l1', '📗', 'Qua bài đầu tiên', 'lessons', 1], ['l5', '📚', 'Qua 5 bài', 'lessons', 5], ['l10', '🎓', 'Qua 10 bài', 'lessons', 10],
+  ['l25', '🏫', 'Qua 25 bài', 'lessons', 25], ['l50', '🌍', 'Qua 50 bài', 'lessons', 50],
+  ['w10', '💪', 'Chinh phục 10 từ', 'words', 10], ['w25', '🦾', 'Chinh phục 25 từ', 'words', 25], ['w50', '🧩', 'Chinh phục 50 từ', 'words', 50], ['w100', '📖', 'Chinh phục 100 từ', 'words', 100],
+  ['r1', '🧠', 'Ôn bài đầu tiên', 'reviews', 1], ['r10', '🔁', 'Ôn 10 lượt', 'reviews', 10],
+  ['f10', '🎯', '10 câu đúng ngay trong 1 ngày', 'firstDay', 10]
+];
+function badgeKey(id) { return ST.keys(id).badges; }
+function badgesOf(id) { try { const v = JSON.parse(localStorage.getItem(badgeKey(id))); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } }
+function metrics(d, ls, wd) {
+  const st = Object.values(d).map(dayStats);
+  return {
+    passed: st.reduce((a, s) => a + s.passed, 0),
+    streak: Math.max(bestStreak(d), streakInfo(d).n),
+    lessons: ls.filter(isDone).length,
+    words: Object.values(wd).filter(e => e[2]).length,
+    reviews: ls.reduce((a, l) => a + ((l.rev && l.rev.n) || 0), 0),
+    firstDay: Math.max(0, ...st.map(s => s.first))
+  };
+}
+function awardBadges(quiet) {
+  const got = badgesOf(PID), m = metrics(days(), lessons(), wordsOf(PID)), fresh = [];
+  for (const [id, icon, name, key, n] of BADGES) if (!got[id] && m[key] >= n) { got[id] = today(); fresh.push(icon + ' ' + name); }
+  if (!fresh.length) return;
+  try { localStorage.setItem(badgeKey(PID), JSON.stringify(got)); } catch {}
+  ST.changed(PID);
+  if (quiet) return;
+  setTimeout(() => {
+    const el = $('msg'), b = 'Huy hiệu mới: ' + fresh.join(', ') + '!';
+    say(!el.hidden && el.textContent ? el.textContent + ' ' + b : b, true);   // không đè thông báo đang hiện
+    celebrate(document.querySelector('#practice .card'));
+  }, 1600);
+}
+function renderBadges() {
+  const got = badgesOf(PID), m = metrics(days(), lessons(), wordsOf(PID));
+  const box = $('stBadges'); box.textContent = '';
+  const fmt = k => { const [y, mo, da] = k.split('-'); return +da + '/' + +mo; };
+  // đã có trước, rồi tới cái sắp đạt
+  const nextOf = {};   // chưa đạt: mỗi loại chỉ hiện mốc gần nhất, đỡ rối
+  for (const b of BADGES) if (!got[b[0]] && !nextOf[b[3]]) nextOf[b[3]] = b[0];
+  const list = BADGES.filter(b => got[b[0]] || nextOf[b[3]] === b[0]).map(b => ({ b, have: got[b[0]], prog: Math.min(1, m[b[3]] / b[4]) }))
+    .sort((x, y) => (!!y.have - !!x.have) || (x.have ? (x.have < y.have ? 1 : -1) : y.prog - x.prog));
+  for (const { b: [id, icon, name, key, n], have } of list) {
+    const c = document.createElement('div'); c.className = 'bdg' + (have ? ' got' : '');
+    const i = document.createElement('i'); i.textContent = icon;
+    const t = document.createElement('b'); t.textContent = name;
+    const sm = document.createElement('small'); sm.textContent = have ? fmt(have) : Math.min(m[key], n) + '/' + n;
+    c.append(i, t, sm); box.append(c);
+  }
+}
+
+/* ---------- bản thu trước / sau (chỉ lưu trên máy, IndexedDB) ---------- */
+let clipBlob = null;
+const clipDB = (() => {
+  let p = null;
+  return () => p || (p = new Promise((res, rej) => {
+    try {
+      const r = indexedDB.open('noitheo-clips', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('clips');
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    } catch (e) { rej(e); }
+  }));
+})();
+async function clipOp(mode, fn) {
+  const db = await clipDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('clips', mode), st = tx.objectStore('clips');
+    const out = fn(st);
+    tx.oncomplete = () => res(out && 'result' in out ? out.result : out); tx.onerror = () => rej(tx.error);
+  });
+}
+const clipKey = (lid, i) => PID + '|' + lid + '|' + i;
+async function saveClip(lid, i, blob, score, passed) {
+  try {
+    const key = clipKey(lid, i);
+    const cur = await clipOp('readonly', st => st.get(key));
+    const now = { b: blob, d: today(), s: Math.floor(score * 1000) / 1000 };
+    const rec = cur || { first: now };
+    if (cur && passed) rec.last = now;
+    await clipOp('readwrite', st => st.put(rec, key));
+    if (L && L.id === lid && (i === 'w' ? P.mode === 1 : idx === i)) renderBA();
+  } catch {}
+}
+let baAudio = null, baUrl = null;
+function playClip(blob, btn) {
+  if (baAudio) { baAudio.pause(); baAudio = null; }
+  if (baUrl) { URL.revokeObjectURL(baUrl); baUrl = null; }
+  if (!blob) return;
+  baUrl = URL.createObjectURL(blob); baAudio = new Audio(baUrl);
+  baAudio.play().catch(() => {});
+}
+const dm = k => { const [, mo, da] = k.split('-'); return +da + '/' + +mo; };
+let baRec = null;
+async function renderBA() {
+  $('ba').hidden = true; baRec = null;
+  if (!L) return;
+  const key = clipKey(L.id, P.mode === 1 ? 'w' : idx), lid = L.id;
+  let rec = null;
+  try { rec = await clipOp('readonly', st => st.get(key)); } catch { return; }
+  if (!L || L.id !== lid || clipKey(L.id, P.mode === 1 ? 'w' : idx) !== key) return;
+  if (!rec || !rec.last || rec.last.d === rec.first.d) return;   // cần 2 ngày khác nhau mới so được
+  baRec = rec;
+  $('baFirst').textContent = '▶ Lần đầu ' + dm(rec.first.d) + ' (' + pct(rec.first.s) + ')';
+  $('baLast').textContent = '▶ ' + (rec.last.d === today() ? 'Hôm nay' : dm(rec.last.d)) + ' (' + pct(rec.last.s) + ')';
+  $('ba').hidden = false;
+}
+$('ba').addEventListener('click', e => { const b = e.target.closest('[data-ba]'); if (b && baRec) playClip(baRec[b.dataset.ba].b, b); });
+async function renderClips() {
+  const ul = $('stClips'); ul.textContent = '';
+  let rows = [];
+  try {
+    rows = await clipOp('readonly', st => { const out = []; const c = st.openCursor(); c.onsuccess = () => { const cur = c.result; if (!cur) return; if (String(cur.key).startsWith(PID + '|')) out.push([cur.key, cur.value]); cur.continue(); }; return out; });
+  } catch {}
+  const all = lessons();
+  const list = rows.filter(([, v]) => v.last && v.last.d !== v.first.d)
+    .map(([k, v]) => { const [, lid, i] = String(k).split('|'); const l = all.find(x => x.id === lid); return l && { l, i, v, gain: v.last.s - v.first.s }; })
+    .filter(Boolean).sort((a, b) => b.gain - a.gain).slice(0, 6);
+  if (!list.length) { const li = document.createElement('li'); li.className = 'hint'; li.textContent = 'Chưa có. Khi một câu được luyện ở hai ngày khác nhau, bản thu lần đầu và lần nói đạt gần nhất sẽ hiện ở đây để so sánh.'; ul.append(li); return; }
+  for (const { l, i, v } of list) {
+    const li = document.createElement('li');
+    const en = document.createElement('span'); en.className = 'en';
+    en.textContent = i === 'w' ? (l.title || 'Bài') + ' (cả bài)' : (l.items[+i] || {}).en || '';
+    const row = document.createElement('div'); row.className = 'row';
+    for (const [w, label] of [['first', '▶ Lần đầu ' + dm(v.first.d) + ' (' + pct(v.first.s) + ')'], ['last', '▶ ' + dm(v.last.d) + ' (' + pct(v.last.s) + ')']]) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn small'; b.textContent = label;
+      b.addEventListener('click', () => playClip(v[w].b, b)); row.append(b);
+    }
+    li.append(en, row); ul.append(li);
+  }
 }
 
 /* ---------- tổng kết cho bố mẹ ---------- */
@@ -2601,6 +2831,10 @@ function renderParents() {
     const hard = Object.entries(wd).filter(([, e]) => !e[2]).sort((a, b) => b[1][0] - a[1][0]).slice(0, 5).map(([w]) => w);
     const wonWeek = Object.values(wd).filter(e => e[2] && e[2] >= wsKey && e[2] <= weKey).length;
     if (wonWeek) notes.push('Chinh phục thêm ' + wonWeek + ' từ khó trong tuần.');
+    const bg = badgesOf(p.id), newB = BADGES.filter(b => bg[b[0]] && bg[b[0]] >= wsKey && bg[b[0]] <= weKey);
+    if (newB.length) notes.push('Huy hiệu mới: ' + newB.map(b => b[1] + ' ' + b[2]).join(', ') + '.');
+    const revN = ls.reduce((a, l) => a + (l.rev && l.rev.last && l.rev.last.d >= wsKey && l.rev.last.d <= weKey ? 1 : 0), 0);
+    if (revN) notes.push('Đã ôn lại ' + revN + ' bài cũ.');
     for (const n of notes) { const pn = document.createElement('p'); pn.className = 'note'; pn.textContent = n; c.append(pn); }
     if (hard.length) {
       const hp = document.createElement('p'); hp.className = 'note'; hp.textContent = 'Từ hay nói sai, nên kèm con: ';
@@ -2698,6 +2932,11 @@ window.NTApp = {
 /* ---------- khởi động ---------- */
 loadPrefs();
 seed();
+(() => {   // bài đã qua từ trước khi có lịch ôn: hẹn ôn sau 7 ngày kể từ hôm nay
+  const all = lessons(); let ch = false;
+  for (const l of all) if (!l.doneAt && isDone(l)) { l.doneAt = today(); l.rev = { due: plusDays(REVIEW_GAPS[0]), n: 0 }; ch = true; }
+  if (ch) writeLessons(all);
+})();
 if (synth) {
   loadVoices();
   if (synth.addEventListener) synth.addEventListener('voiceschanged', loadVoices);
