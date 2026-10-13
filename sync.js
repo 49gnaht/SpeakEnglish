@@ -3,7 +3,7 @@
    Firestore: users/{uid} = { profiles, gone }; users/{uid}/profiles/{pid} = { lessons, prefs, prefsAt, samples, deleted } */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFirestore, doc, getDoc, setDoc, addDoc, collection, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const app = initializeApp({
   apiKey: 'AIzaSyCUDSvAoF8lf0qfb1tCO-5SQT95VOQU78U',
@@ -11,7 +11,8 @@ const app = initializeApp({
   projectId: 'noitheo',
   storageBucket: 'noitheo.firebasestorage.app',
   messagingSenderId: '107995428809',
-  appId: '1:107995428809:web:e77da976d2f61f5dcd1a18'
+  appId: '1:107995428809:web:e77da976d2f61f5dcd1a18',
+  measurementId: 'G-YKR83X99GY'
 });
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -228,13 +229,43 @@ onAuthStateChanged(auth, u => {
   if (u) syncAll();
 });
 
+/* ---------- thống kê sử dụng (Google Analytics qua Firebase) ----------
+   Nạp riêng: bị trình chặn quảng cáo chặn thì đăng nhập/đồng bộ vẫn chạy. Tắt cá nhân hóa quảng cáo vì có người dùng là trẻ em. */
+(async () => {
+  try {
+    const A = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js');
+    if (!(await A.isSupported())) return;
+    const an = A.initializeAnalytics(app, { config: { allow_google_signals: false, allow_ad_personalization_signals: false } });
+    const send = (name, params) => { try { A.logEvent(an, name, params || {}); } catch {} };
+    const q = window.__ntq || [];
+    window.NTTrack = send;
+    for (const [n, p] of q) send(n, p);
+    window.__ntq = [];
+  } catch (e) { console.warn('analytics', e); }
+})();
+
+async function sendFeedback(f) {
+  const data = {
+    text: String(f.text || '').slice(0, 2000),
+    rating: Math.max(0, Math.min(4, +f.rating || 0)),
+    contact: String(f.contact || '').slice(0, 200),
+    page: String(f.page || '').slice(0, 200),
+    profileKind: String(f.profileKind || '').slice(0, 20),
+    ua: navigator.userAgent.slice(0, 300),
+    uid: state.user ? state.user.uid : '',
+    ts: serverTimestamp()
+  };
+  await addDoc(collection(db, 'feedback'), data);
+}
+
 window.NTSync = {
+  sendFeedback,
   state,
   async signIn() {
     state.error = ''; emit();
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    try { await signInWithPopup(auth, provider); }
+    try { await signInWithPopup(auth, provider); if (window.NTTrack) window.NTTrack('login', { method: 'google' }); }
     catch (e) {
       if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment')) return signInWithRedirect(auth, provider);
       if (e && (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request')) return;

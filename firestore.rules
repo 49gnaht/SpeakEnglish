@@ -5,5 +5,14 @@ service cloud.firestore {
     match /users/{uid}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+    // Góp ý: ai cũng gửi được (kể cả chưa đăng nhập), không ai đọc/sửa được từ web; xem trong Firebase Console
+    match /feedback/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['text', 'rating', 'contact', 'page', 'profileKind', 'ua', 'uid', 'ts'])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000
+        && request.resource.data.contact.size() <= 200;
+      allow read, update, delete: if false;
+    }
   }
 }

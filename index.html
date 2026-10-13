@@ -82,6 +82,16 @@ h1, h2, p, ul, ol, pre { margin: 0; padding: 0; }
 .modes { display: inline-flex; justify-self: start; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; }
 .modes a { padding: 8px 14px; color: var(--muted); text-decoration: none; font-weight: 500; }
 .modes a + a { border-left: 1px solid var(--line); }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fb { width: min(520px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: 14px; padding: 20px; background: var(--surface); color: var(--ink); }
+.fb::backdrop { background: rgba(0, 0, 0, 0.4); }
+.fb form { display: grid; gap: 12px; }
+.fb h2 { margin: 0; font-size: var(--t-lg); }
+.fb p { margin: 0; }
+.fb textarea { min-height: 120px; }
+.rate { display: flex; gap: 8px; }
+.rate button { font-size: 28px; line-height: 1; padding: 6px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); cursor: pointer; }
+.rate button[aria-pressed="true"] { border-color: var(--accent); background: var(--lane); }
 .modes a[aria-current="page"] { background: var(--ink); color: var(--bg); }
 
 h1 { font-size: var(--t-lg); font-weight: 800; line-height: 1.25; letter-spacing: -0.01em; text-wrap: balance; overflow-wrap: anywhere; }
@@ -330,10 +340,13 @@ select.field { height: 44px; padding: 0 10px; }
 </head>
 <body>
 <div class="app" id="app">
-  <nav class="modes" aria-label="Chọn cách luyện">
-    <a href="video.html">Video</a>
-    <a href="./" aria-current="page">Bài viết</a>
-  </nav>
+  <div class="topbar">
+    <nav class="modes" aria-label="Chọn cách luyện">
+      <a href="video.html">Video</a>
+      <a href="./" aria-current="page">Bài viết</a>
+    </nav>
+    <button class="btn small" type="button" id="fbOpen">💬 Góp ý</button>
+  </div>
   <p class="msg" id="msg" role="status" hidden></p>
 
   <!-- danh sách bài -->
@@ -622,6 +635,26 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
 
 <audio id="audio" hidden></audio>
 
+<dialog class="fb" id="fb" aria-labelledby="fbHead">
+  <form id="fbForm" method="dialog">
+    <h2 id="fbHead">Góp ý cho Nói Theo</h2>
+    <p class="hint">Bạn thấy app thế nào? Chỗ nào khó dùng, máy chấm sai câu nào, muốn thêm bài gì… cứ viết thoải mái.</p>
+    <div class="rate" id="fbRate" role="group" aria-label="Mức hài lòng">
+      <button type="button" data-v="1" aria-label="Không thích">😞</button>
+      <button type="button" data-v="2" aria-label="Bình thường">😐</button>
+      <button type="button" data-v="3" aria-label="Thích">🙂</button>
+      <button type="button" data-v="4" aria-label="Rất thích">😍</button>
+    </div>
+    <textarea id="fbText" maxlength="2000" placeholder="Viết góp ý ở đây" required></textarea>
+    <input class="field" id="fbContact" type="text" maxlength="200" autocomplete="email" placeholder="Email hoặc Zalo nếu muốn được trả lời (không bắt buộc)">
+    <p class="hint" id="fbMsg" role="status"></p>
+    <div class="row">
+      <button class="btn primary" type="submit" id="fbSend">Gửi góp ý</button>
+      <button class="btn" type="button" id="fbClose">Đóng</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="store.js"></script>
 <script type="module" src="sync.js"></script>
 <script>
@@ -630,6 +663,10 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
 
 const $ = id => document.getElementById(id);
 const ST = window.NTStore, PID = ST.cur(), K = ST.keys(PID);   // hồ sơ đang học
+// thống kê sử dụng: gửi qua sync.js khi đã nạp, chưa nạp thì xếp hàng chờ
+function track(name, params) {
+  try { if (window.NTTrack) window.NTTrack(name, params); else (window.__ntq = window.__ntq || []).push([name, params]); } catch {}
+}
 const KEY = K.lessons;
 const PREF = K.prefs;
 const IS_ANDROID = /Android/i.test(navigator.userAgent);
@@ -1013,7 +1050,7 @@ function writeLessons(all) { try { localStorage.setItem(KEY, JSON.stringify(all)
 function putLesson(l) {
   const all = lessons(), i = all.findIndex(x => x.id === l.id);
   l.mod = Date.now();
-  if (!l.doneAt && l.items && isDone(l)) { l.doneAt = today(); l.rev = { due: plusDays(REVIEW_GAPS[0]), n: 0 }; }
+  if (!l.doneAt && l.items && isDone(l)) { l.doneAt = today(); l.rev = { due: plusDays(REVIEW_GAPS[0]), n: 0 }; track('lesson_done', { group: groupOf(l) === 1 ? 'kid' : 'adult', sample: l.sample ? 1 : 0 }); }
   const { justDone, ...keep } = l;   // trạng thái tạm, không lưu
   if (i >= 0) all[i] = keep; else all.unshift(keep);
   writeLessons(all);
@@ -1539,6 +1576,7 @@ function listen(withRec, retried) {
         'audio-capture': 'Không mở được micro. Kiểm tra micro rồi thử lại.',
         'language-not-supported': 'Máy này chưa nhận được giọng tiếng Anh.'
       }[err];
+      if (err && err !== 'aborted') track('mic_error', { err });
       if (err !== 'aborted') say(m || 'Chưa nghe thấy gì. Bấm Nói rồi đọc to, rõ hơn.', !!m);
       return;
     }
@@ -1749,6 +1787,7 @@ async function finishWhole() {
       'audio-capture': 'Không mở được micro. Kiểm tra micro rồi thử lại.',
       'language-not-supported': 'Máy này chưa nhận được giọng tiếng Anh.'
     }[W.err];
+    if (W.err) track('mic_error', { err: W.err });
     say(m || 'Chưa nghe thấy gì. Bấm Nói cả bài rồi đọc to, rõ hơn.', !!m);
     W.live = null; render(); return;
   }
@@ -1763,6 +1802,7 @@ async function finishWhole() {
   putLesson(L);
   logWords(L.items.flatMap((it, si) => tokens(it.en).map((t, k) => [t.subs.join(' '), r.marks[si] ? r.marks[si][k] : null])));
   const goalHit = logWhole(L, r.score);
+  track('whole_try', { group: isKid() ? 'kid' : 'adult', score: Math.round(r.score * 10) * 10, echo: W.echo ? 1 : 0, review: reviewing === L.id ? 1 : 0 });
   if (clipBlob) { saveClip(L.id, 'w', clipBlob, r.score, r.score >= wholeNeed(L)); clipBlob = null; }
   const rv = reviewing === L.id ? finishReview(L, r.score) : null;
   render();
@@ -1861,6 +1901,8 @@ function finish(r) {
   const red = tk.filter((t, k) => r.marks[k] === false).map(t => t.subs.join(' '));
   logWords(tk.map((t, k) => [t.subs.join(' '), r.marks[k]]));
   const goalHit = logSentence(L, idx, passed, red);
+  track('sentence_try', { group: isKid() ? 'kid' : 'adult', passed: passed ? 1 : 0 });
+  if (!ST.get('speak.activated')) { ST.set('speak.activated', today()); track('activate', { group: isKid() ? 'kid' : 'adult' }); }
   if (clipBlob) { saveClip(L.id, idx, clipBlob, eff, passed); clipBlob = null; }
   render();
   if (goalHit) goalReached();
@@ -2165,7 +2207,7 @@ function renderGate() {
     }
     if (isKid() && !P.echo && SR) {
       const q = document.createElement('button'); q.type = 'button'; q.className = 'link small'; q.textContent = 'Bé chưa đọc được cả đoạn? Bật nghe – nói theo';
-      q.addEventListener('click', () => { P.echo = true; savePrefs(); $('echo').checked = true; renderGate(); render(); say('Đã bật cho hồ sơ này: khi nói cả bài, app đọc từng câu và bé nói theo.'); });
+      q.addEventListener('click', () => { P.echo = true; savePrefs(); track('echo_toggle', { on: 1, from: 'gate' }); $('echo').checked = true; renderGate(); render(); say('Đã bật cho hồ sơ này: khi nói cả bài, app đọc từng câu và bé nói theo.'); });
       g.append(q);
     }
   } else { g.hidden = true; return; }
@@ -2217,8 +2259,8 @@ function route() {
     }
   }
   if (h.startsWith('bai=')) reviewing = null;
-  if (h === 'thongke') { L = null; renderStats(); show('stats'); return; }
-  if (h === 'bome') { L = null; renderParents(); show('parents'); return; }
+  if (h === 'thongke') { L = null; renderStats(); show('stats'); track('view_stats'); return; }
+  if (h === 'bome') { L = null; renderParents(); show('parents'); track('view_parents'); return; }
   if (h === 'hoso') { L = null; renderAccount(); show('account'); return; }
   if (h === 'moi') { L = null; newGroup = P.group; renderGroupIn(); show('create'); $('paste').focus({ preventScroll: true }); return; }
   if (h.startsWith('bai=')) {
@@ -2287,6 +2329,7 @@ $('saveLesson').addEventListener('click', () => {
     group: newGroup, items: parsed.items, best: {}, last: 0, created: Date.now()
   };
   putLesson(l);
+  track('lesson_created', { group: newGroup === 1 ? 'kid' : 'adult', sentences: l.items.length });
   P.group = newGroup; savePrefs();
   $('paste').value = ''; $('titleIn').value = ''; titleTouched = false; onPaste();
   location.hash = 'bai=' + l.id;
@@ -2346,7 +2389,7 @@ $('loopListen').addEventListener('change', e => {
 $('autoNext').addEventListener('change', e => { P.autoNext = e.target.checked; savePrefs(); if (!P.autoNext) clearTimeout(nextTimer); renderResult(); });
 $('voice').addEventListener('change', e => { P.voice = e.target.value; savePrefs(); });
 $('goal').addEventListener('change', e => { P.goal = +e.target.value || 10; savePrefs(); });
-$('echo').addEventListener('change', e => { P.echo = e.target.checked; savePrefs(); renderGate(); render(); });
+$('echo').addEventListener('change', e => { P.echo = e.target.checked; savePrefs(); track('echo_toggle', { on: P.echo ? 1 : 0 }); renderGate(); render(); });
 $('recOnly').addEventListener('click', toggleSelfRec);
 $('askAi').addEventListener('click', askGemini);
 $('aiCopy').addEventListener('click', async () => {
@@ -2441,6 +2484,7 @@ function logWhole(l, score) {
   return hit;
 }
 function goalReached() {
+  track('goal_reached', { goal: P.goal || 10 });
   celebrate(document.querySelector('#practice .card'));
   say('Đạt mục tiêu hôm nay: ' + (P.goal || 10) + ' câu! Được thêm một ngôi sao trên lịch ⭐');
 }
@@ -2681,6 +2725,7 @@ function finishReview(l, score) {
   l.rev = l.rev || { n: 0 };
   l.rev.last = { d: today(), s: Math.floor(score * 1000) / 1000 };
   let msg;
+  track('review_done', { passed: score >= need ? 1 : 0 });
   if (score >= need) {
     l.rev.n = (l.rev.n || 0) + 1;
     const gap = REVIEW_GAPS[Math.min(l.rev.n, REVIEW_GAPS.length - 1)];
@@ -2731,7 +2776,7 @@ function metrics(d, ls, wd) {
 }
 function awardBadges(quiet) {
   const got = badgesOf(PID), m = metrics(days(), lessons(), wordsOf(PID)), fresh = [];
-  for (const [id, icon, name, key, n] of BADGES) if (!got[id] && m[key] >= n) { got[id] = today(); fresh.push(icon + ' ' + name); }
+  for (const [id, icon, name, key, n] of BADGES) if (!got[id] && m[key] >= n) { got[id] = today(); fresh.push(icon + ' ' + name); track('badge_earned', { badge: id }); }
   if (!fresh.length) return;
   try { localStorage.setItem(badgeKey(PID), JSON.stringify(got)); } catch {}
   ST.changed(PID);
@@ -2980,6 +3025,7 @@ $('addProfile').addEventListener('submit', e => {
   const name = $('profileName').value.trim().slice(0, 30);
   if (!name) { $('profileName').focus(); return; }
   const p = ST.addProfile(name);
+  track('profile_added', { count: ST.profiles().length });
   ST.setCur(p.id); location.hash = ''; location.reload();
 });
 $('pwWeek').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; pwOff = +b.dataset.v; renderParents(); });
@@ -2996,6 +3042,37 @@ window.NTApp = {
     else if (!$('account').hidden) renderAccount();
   }
 };
+
+/* ---------- góp ý ---------- */
+let fbRating = 0;
+$('fbOpen').addEventListener('click', () => {
+  $('fbMsg').textContent = ''; $('fbSend').disabled = false;
+  const d = $('fb'); if (d.showModal) d.showModal(); else d.setAttribute('open', '');
+  track('feedback_open');
+});
+$('fbClose').addEventListener('click', () => { const d = $('fb'); if (d.close) d.close(); else d.removeAttribute('open'); });
+$('fbRate').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  fbRating = +b.dataset.v;
+  $('fbRate').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+});
+$('fbForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const text = $('fbText').value.trim();
+  if (!text) { $('fbText').focus(); return; }
+  if (!window.NTSync || !window.NTSync.sendFeedback) { $('fbMsg').textContent = 'Chưa kết nối được máy chủ. Kiểm tra mạng rồi thử lại.'; return; }
+  $('fbSend').disabled = true; $('fbMsg').textContent = 'Đang gửi…';
+  try {
+    await window.NTSync.sendFeedback({ text, rating: fbRating, contact: $('fbContact').value.trim(), page: location.pathname + location.hash + (L ? ' | ' + (L.title || L.id) + ' câu ' + (idx + 1) : ''), profileKind: P.group === 1 ? 'kid' : 'adult' });
+    track('feedback_sent', { rating: fbRating });
+    $('fbText').value = ''; $('fbContact').value = ''; fbRating = 0;
+    $('fbRate').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', 'false'));
+    $('fbMsg').textContent = 'Đã gửi. Cảm ơn bạn nhiều!';
+    setTimeout(() => { const d = $('fb'); if (d.open && d.close) d.close(); }, 1500);
+  } catch (err) {
+    $('fbMsg').textContent = 'Chưa gửi được, bạn thử lại sau nhé. Nội dung vẫn còn trong ô.';
+  } finally { $('fbSend').disabled = false; }
+});
 
 /* ---------- khởi động ---------- */
 loadPrefs();
