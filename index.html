@@ -261,7 +261,8 @@ select.field { height: 44px; padding: 0 10px; }
 .list li .lock-note { grid-column: 1 / -1; }
 .who { justify-self: start; font-size: var(--t-xs); color: var(--muted); text-decoration: none; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
 .who b { color: var(--ink); font-weight: 600; }
-.profiles li { grid-template-columns: minmax(0, 1fr) auto auto; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.field.kind { width: auto; height: 36px; padding: 0 8px; font-size: var(--t-xs); }
+.profiles li { grid-template-columns: minmax(0, 1fr) auto auto auto; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
 .profiles li.on { border-color: var(--accent); }
 .profiles .pick { text-align: left; background: none; border: 0; padding: 0; font: inherit; font-weight: 600; cursor: pointer; color: var(--ink); overflow-wrap: anywhere; }
 .grow { flex: 1 1 160px; min-width: 0; }
@@ -404,6 +405,11 @@ select.field { height: 44px; padding: 0 10px; }
     <ul class="list profiles" id="profileList"></ul>
     <form class="row" id="addProfile">
       <input class="field grow" id="profileName" type="text" maxlength="30" autocomplete="off" placeholder="Tên người học, ví dụ: Bé An">
+      <select class="field kind" id="profileKind" aria-label="Bài học hiện cho người mới">
+        <option value="1">Bài: trẻ em</option>
+        <option value="0">Bài: người lớn</option>
+        <option value="">Bài: cả hai</option>
+      </select>
       <button class="btn" type="submit">Thêm</button>
     </form>
     <a class="btn" href="#bome">Tổng kết tuần cho bố mẹ</a>
@@ -667,6 +673,9 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
 
 const $ = id => document.getElementById(id);
 const ST = window.NTStore, PID = ST.cur(), K = ST.keys(PID);   // hồ sơ đang học
+// hồ sơ chỉ học bài người lớn (0) hoặc trẻ em (1); không đặt = cả hai
+const KIND = (() => { const me = ST.profiles().find(p => p.id === PID); return me && (me.kind === 0 || me.kind === 1) ? me.kind : null; })();
+const KIND_NAMES = { '': 'Cả hai', 0: 'Người lớn', 1: 'Trẻ em' };
 // thống kê sử dụng: gửi qua sync.js khi đã nạp, chưa nạp thì xếp hàng chờ
 function track(name, params) {
   try { if (window.NTTrack) window.NTTrack(name, params); else (window.__ntq = window.__ntq || []).push([name, params]); } catch {}
@@ -2115,6 +2124,7 @@ function renderList() {
   $('kidRule').hidden = P.group !== 1;
   let nextMarked = false;
   const counts = [0, 0]; everything.forEach(l => counts[groupOf(l)]++);
+  $('groupTabs').hidden = KIND != null;
   [...$('groupTabs').children].forEach((b, i) => {
     b.textContent = (i ? 'Trẻ em' : 'Người lớn') + ' (' + counts[i] + ')';
     b.setAttribute('aria-pressed', String(i === P.group));
@@ -2268,7 +2278,7 @@ function route() {
     const l = lessons().find(x => x.id === h.slice(3));
     if (l) {
       L = l; L.best = L.best || {}; L.justDone = false; reviewing = l.id; wholeFails = 0;
-      if (P.group !== groupOf(l)) { P.group = groupOf(l); savePrefs(); }
+      if (KIND == null && P.group !== groupOf(l)) { P.group = groupOf(l); savePrefs(); }
       queue = null; W.result = null; W.live = null; W.peek = false;
       show('practice');
       go(Math.min(L.last || 0, L.items.length - 1));
@@ -2287,7 +2297,7 @@ function route() {
     const l = all.find(x => x.id === h.slice(4));
     const lock = l && lockState(l, all);
     if (lock) {
-      if (P.group !== groupOf(l)) { P.group = groupOf(l); savePrefs(); }
+      if (KIND == null && P.group !== groupOf(l)) { P.group = groupOf(l); savePrefs(); }
       L = null; renderList(); show('home');
       say(lock === 'order' ? 'Bài này chưa mở: qua bài trước đã nhé.' : 'Hôm nay học đủ bài mới rồi, mai học tiếp nhé!');
       try { history.replaceState(null, '', location.pathname); } catch {}
@@ -2296,7 +2306,7 @@ function route() {
     if (l) {
       if (inSeq(l) && !l.started && !isDone(l)) { l.started = today(); putLesson(l); }
       L = l; L.best = L.best || {}; L.justDone = false; wholeFails = 0;
-      if (P.group !== groupOf(l)) { P.group = groupOf(l); savePrefs(); }   // quay lại danh sách đúng tab
+      if (KIND == null && P.group !== groupOf(l)) { P.group = groupOf(l); savePrefs(); }   // quay lại danh sách đúng tab
       queue = null; W.result = null; W.live = null; W.peek = false;
       show('practice');
       go(Math.min(L.last || 0, L.items.length - 1));
@@ -2336,7 +2346,11 @@ function onPaste() {
 $('paste').addEventListener('input', onPaste);
 $('titleIn').addEventListener('input', () => { titleTouched = !!$('titleIn').value; });
 let newGroup = 0;
-function renderGroupIn() { setSeg('groupIn', newGroup); }
+function renderGroupIn() {
+  if (KIND != null) newGroup = KIND;
+  $('groupIn').hidden = $('groupInLabel').hidden = KIND != null;
+  setSeg('groupIn', newGroup);
+}
 $('groupIn').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { newGroup = +b.dataset.v; renderGroupIn(); } });
 $('adultOrder').addEventListener('change', e => { P.adultOrder = e.target.checked; savePrefs(); renderList(); });
 $('groupTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; P.group = +b.dataset.v; savePrefs(); renderList(); });
@@ -3006,7 +3020,7 @@ function renderWho() {
   const u = window.NTSync && window.NTSync.state.user;
   const w = $('who'); w.textContent = '';
   const b = document.createElement('b'); b.textContent = me ? me.name : '';
-  w.append('Đang học: ', b, u ? ' · đã lưu lên tài khoản' : ' · đổi người học');
+  w.append('Đang học: ', b, KIND != null ? ' (' + KIND_NAMES[KIND].toLowerCase() + ')' : '', u ? ' · đã lưu lên tài khoản' : ' · đổi người học');
 }
 function renderAccount() {
   const ul = $('profileList'); ul.textContent = '';
@@ -3016,7 +3030,10 @@ function renderAccount() {
     const pick = document.createElement('button'); pick.type = 'button'; pick.className = 'pick'; pick.dataset.pick = p.id;
     pick.textContent = p.name + (p.id === PID ? ' (đang học)' : '');
     const ren = document.createElement('button'); ren.type = 'button'; ren.className = 'link muted'; ren.dataset.ren = p.id; ren.textContent = 'Đổi tên';
-    li.append(pick, ren);
+    const kd = document.createElement('select'); kd.className = 'field kind'; kd.dataset.kind = p.id; kd.setAttribute('aria-label', 'Bài học hiện cho ' + p.name);
+    for (const v of ['', '0', '1']) { const o = document.createElement('option'); o.value = v; o.textContent = 'Bài: ' + KIND_NAMES[v].toLowerCase(); kd.append(o); }
+    kd.value = p.kind === 0 || p.kind === 1 ? String(p.kind) : '';
+    li.append(pick, ren, kd);
     if (list.length > 1) {
       const del = document.createElement('button'); del.type = 'button'; del.className = 'link muted'; del.dataset.pdel = p.id; del.textContent = 'Xóa';
       li.append(del);
@@ -3062,11 +3079,19 @@ $('profileList').addEventListener('click', e => {
     renderAccount();
   }
 });
+$('profileList').addEventListener('change', e => {
+  const sel = e.target.closest('select[data-kind]'); if (!sel) return;
+  const v = sel.value === '' ? null : +sel.value;
+  ST.saveProfiles(ST.profiles().map(p => { if (p.id !== sel.dataset.kind) return p; const q = { ...p, at: Date.now() }; if (v == null) delete q.kind; else q.kind = v; return q; }));
+  track('profile_kind', { kind: v == null ? 'both' : v ? 'kid' : 'adult' });
+  if (sel.dataset.kind === PID) { location.hash = 'hoso'; location.reload(); }
+});
 $('addProfile').addEventListener('submit', e => {
   e.preventDefault();
   const name = $('profileName').value.trim().slice(0, 30);
   if (!name) { $('profileName').focus(); return; }
-  const p = ST.addProfile(name);
+  const kv = $('profileKind').value;
+  const p = ST.addProfile(name, kv === '' ? null : +kv);
   track('profile_added', { count: ST.profiles().length });
   ST.setCur(p.id); location.hash = ''; location.reload();
 });
@@ -3118,6 +3143,7 @@ $('fbForm').addEventListener('submit', async e => {
 
 /* ---------- khởi động ---------- */
 loadPrefs();
+if (KIND != null && P.group !== KIND) { P.group = KIND; savePrefs(); }
 seed();
 (() => {   // bài đã qua từ trước khi có lịch ôn: hẹn ôn sau 7 ngày kể từ hôm nay
   const all = lessons(); let ch = false;

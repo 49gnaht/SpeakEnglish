@@ -26,8 +26,8 @@
   function cur() { const c = get(CUR), list = profiles(); return list.some(p => p.id === c) ? c : list[0].id; }
   function setCur(id) { set(CUR, id); }
   function newId() { return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-  function addProfile(name) { const p = { id: newId(), name }; saveProfiles(profiles().concat(p)); return p; }
-  function renameProfile(id, name) { saveProfiles(profiles().map(p => (p.id === id ? { ...p, name } : p))); }
+  function addProfile(name, kind) { const p = { id: newId(), name, at: Date.now() }; if (kind === 0 || kind === 1) p.kind = kind; saveProfiles(profiles().concat(p)); return p; }
+  function renameProfile(id, name) { saveProfiles(profiles().map(p => (p.id === id ? { ...p, name, at: Date.now() } : p))); }
   function removeProfile(id) {
     const list = profiles().filter(p => p.id !== id);
     if (!list.length) return;

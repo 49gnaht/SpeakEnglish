@@ -170,7 +170,11 @@ async function syncProfiles(uid) {
   const raw = snap.exists() ? snap.data() : {};
   const gone = union(S.json('speak.profilesGone.v1', []), raw.gone);
   const list = S.profiles().slice();
-  for (const p of raw.profiles || []) if (!list.some(x => x.id === p.id)) list.push(p);
+  for (const p of raw.profiles || []) {
+    const i = list.findIndex(x => x.id === p.id);
+    if (i < 0) list.push(p);
+    else if ((p.at || 0) > (list[i].at || 0)) list[i] = p;   // tên/loại bài đổi ở máy khác mới hơn
+  }
   const merged = list.filter(p => !gone.includes(p.id));
   if (!merged.length) merged.push({ id: 'main', name: 'Hồ sơ chính' });
   const before = JSON.stringify(S.profiles());
