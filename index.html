@@ -169,6 +169,8 @@ textarea { min-height: 180px; resize: vertical; line-height: 1.5; }
 .dot.try { background: var(--bad-bg); border-color: var(--bad); }
 .dot[aria-current="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
 .dot.q { border-style: dashed; border-color: var(--ink); }
+.dot.later { background: var(--soft-bg); border-color: var(--soft); border-style: dashed; }
+.tag.later { border-color: var(--soft); color: var(--soft); }
 
 .card { display: grid; gap: 14px; padding: 22px 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; min-width: 0; }
 .sent { font-size: var(--t-xl); line-height: 1.5; font-weight: 500; overflow-wrap: anywhere; }
@@ -373,7 +375,7 @@ select.field { height: 44px; padding: 0 10px; }
       <button type="button" data-v="1">Trẻ em</button>
     </div>
     <label class="check" id="orderOpt" hidden><input type="checkbox" id="adultOrder"> Học bài mẫu theo thứ tự (qua bài trước mới mở bài sau)</label>
-    <p class="hint" id="kidRule" hidden>Bài mẫu trẻ em mở lần lượt: đọc đạt hết các câu và nói cả bài đạt 70% thì mở bài tiếp theo. Mỗi ngày học tối đa 4 bài mới.</p>
+    <p class="hint" id="kidRule" hidden>Bài mẫu trẻ em mở lần lượt: đọc đạt hết các câu và nói cả bài đạt 70% thì mở bài tiếp theo. Câu nào hay cả bài thử 3 lần chưa đạt thì được tạm bỏ qua, luyện lại sau. Mỗi ngày học tối đa 4 bài mới.</p>
     <section class="review" id="reviewBox" hidden>
       <b>Ôn bài cũ</b>
       <p class="hint">Bài đã qua từ một tuần trước. Nói lại cả bài để nhớ lâu hơn.</p>
@@ -549,6 +551,7 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
     <div class="result only-s" id="result" hidden>
       <span class="badge" id="badge"></span>
       <span class="heard" id="heard"></span>
+      <div class="row"><button class="btn small" type="button" id="skipSent" hidden>Tạm bỏ qua, luyện sau →</button></div>
     </div>
     <p class="live only-s" id="live" aria-live="polite"></p>
 
@@ -561,6 +564,7 @@ Giữa hai cặp để một dòng trống. Không đánh số, không gạch đ
     </article>
     <div class="result only-w" id="wResult" hidden>
       <span class="badge" id="wBadge"></span>
+      <div class="row"><button class="btn small" type="button" id="skipWhole" hidden>Tạm bỏ qua, luyện cả bài sau →</button></div>
       <span class="heard" id="wStats"></span>
       <div class="weak" id="wWeak" hidden>
         <b>Câu còn yếu</b>
@@ -672,8 +676,8 @@ const PREF = K.prefs;
 const IS_ANDROID = /Android/i.test(navigator.userAgent);
 const PASS = 0.85;
 const PASS_KID = 0.7;              // bài trẻ em: dễ qua hơn
-const KID_TRIES = 10;              // từ lần thứ 10, đúng trên 50% thì cho qua
-const KID_SLOW_AT = 5;             // sau 5 lần chưa qua: động viên và đọc mẫu chậm lại
+const SKIP_AT = 3;                 // trẻ em và người lớn: sau 3 lần chưa đạt được tạm bỏ qua, luyện sau
+const KID_SLOW_AT = 3;             // trẻ em: sau 3 lần chưa qua thì đọc mẫu chậm lại
 // Từ ngắn máy hay nghe sót ở giọng trẻ em: không tính trượt
 const STOP = new Set(['a', 'an', 'the', 'to', 'of', 'is', 'am', 'are', 'and', 'in', 'on', 'at']);
 
@@ -1798,6 +1802,8 @@ async function finishWhole() {
   const wasDone = inSeq(L) && isDone(L);
   if (L.firstWhole == null) L.firstWhole = (L.whole && L.whole[0] ? L.whole[0].score : Math.floor(r.score * 1000) / 1000);
   L.whole = (L.whole || []).concat({ ts: Date.now(), score: Math.floor(r.score * 1000) / 1000, secs: Math.round(secs), wpm: r.wpm, level: P.level, ...(W.echo ? { echo: 1 } : {}) }).slice(-20);
+  if (r.score >= wholeNeed(L)) delete L.wholeSkip;
+  else if (reviewing !== L.id) wholeFails++;
   if (inSeq(L) && !wasDone && isDone(L)) L.justDone = true;
   putLesson(L);
   logWords(L.items.flatMap((it, si) => tokens(it.en).map((t, k) => [t.subs.join(' '), r.marks[si] ? r.marks[si][k] : null])));
@@ -1852,6 +1858,7 @@ function nextIndex(dir) {
 const isKid = () => !!L && groupOf(L) === 1;
 const passFor = l => (l && groupOf(l) === 1 ? PASS_KID : PASS);
 let tries = 0, sessBestHits = -1, slowIdx = -1;   // tính trong phiên, rời câu là đếm lại
+let wholeFails = 0;   // số lần nói cả bài chưa đạt trong lần mở bài này
 const CHEERS = ['Giỏi quá!', 'Tuyệt vời!', 'Siêu quá!', 'Hay lắm!', 'Xuất sắc!', 'Đỉnh quá!'];
 function celebrate(box) {
   try {
@@ -1883,17 +1890,17 @@ function finish(r) {
   result = r;
   $('live').textContent = '';
   const need = passFor(L);
-  if (isKid() && r.score < need) {
+  if (r.score < need) {
     tries++;
-    if (sessBestHits >= 0 && r.hits > sessBestHits) r.better = r.hits - sessBestHits;
-    if (tries >= KID_TRIES && r.score > 0.5) r.forced = true;
-    if (tries >= KID_SLOW_AT) slowIdx = idx;
+    if (isKid() && sessBestHits >= 0 && r.hits > sessBestHits) r.better = r.hits - sessBestHits;
+    if (isKid() && tries >= KID_SLOW_AT) slowIdx = idx;
   }
   if (isKid()) sessBestHits = Math.max(sessBestHits, r.hits);
   if (isKid()) r.cheer = CHEERS[Math.floor(Math.random() * CHEERS.length)];
-  const passed = r.score >= need || r.forced;
+  const passed = r.score >= need;
   const wasDone = inSeq(L) && isDone(L);
-  const eff = r.forced ? Math.max(r.score, need) : r.score;
+  const eff = r.score;
+  if (passed && L.skip && L.skip[idx]) delete L.skip[idx];   // câu tạm bỏ qua nay đã đạt
   const best = L.best[idx] || 0;
   if (eff > best) L.best[idx] = Math.floor(eff * 1000) / 1000;
   putLesson(L);
@@ -1954,15 +1961,14 @@ function renderResult() {
   if (!result && !selfCheck) { box.hidden = true; return; }
   box.hidden = false;
   const need = passFor(L);
-  const passed = !!result && (result.score >= need || !!result.forced);
+  const passed = !!result && result.score >= need;
   box.classList.toggle('pass', passed);
   box.classList.toggle('fail', !!result && !passed);
   if (result) {
     const last = idx === L.items.length - 1;
     let label;
     if (isKid()) {
-      if (result.forced && result.score < need) label = 'Bé cố gắng lắm rồi! Câu này qua nhé, mình sang câu sau.';
-      else if (passed) label = (result.cheer || 'Giỏi quá!') + ' Đúng ' + result.hits + '/' + result.total + ' từ.';
+      if (passed) label = (result.cheer || 'Giỏi quá!') + ' Đúng ' + result.hits + '/' + result.total + ' từ.';
       else if (result.better) label = 'Tiến bộ rồi! Lần này đúng ' + result.hits + '/' + result.total + ' từ, hơn lần trước ' + result.better + ' từ.';
       else if (tries >= KID_SLOW_AT) label = 'Câu này khó đấy, bé giỏi lắm vì không bỏ cuộc! Bấm Nghe để nghe chậm lại rồi thử nhé.';
       else label = 'Gần đúng rồi! Nghe mẫu rồi nói lại nhé.';
@@ -1975,9 +1981,13 @@ function renderResult() {
       } else if (passed) label += P.autoNext ? ' Tốt, sang câu sau.' : ' Tốt.';
       else label += ' Nghe lại mẫu rồi nói lại các từ đỏ.';
     }
+    const canSkip = !passed && tries >= SKIP_AT && !(L.skip && L.skip[idx]);
+    if (canSkip) label = isKid() ? 'Câu này khó đấy, bé giỏi lắm vì không bỏ cuộc! Bấm Nghe để nghe chậm rồi thử tiếp, hoặc tạm bỏ qua để luyện lại sau nhé.' : label + ' Có thể tạm bỏ qua câu này, luyện lại sau.';
+    $('skipSent').hidden = !canSkip;
     $('badge').textContent = label;
     $('heard').textContent = 'Máy nghe được: “' + result.heard + '”';
   } else {
+    $('skipSent').hidden = true;
     $('badge').textContent = 'Đã thu xong.';
     $('heard').textContent = 'Nghe lại giọng mình rồi so với câu mẫu.';
   }
@@ -1996,7 +2006,9 @@ function renderDots() {
   [...box.children].forEach((b, i) => {
     const s = L.best[i];
     b.classList.toggle('ok', s >= passFor(L));
-    b.classList.toggle('try', s != null && s < passFor(L));
+    const later = !(s >= passFor(L)) && !!(L.skip && L.skip[i]);
+    b.classList.toggle('later', later);
+    b.classList.toggle('try', s != null && s < passFor(L) && !later);
     b.setAttribute('aria-current', String(i === idx));
     b.classList.toggle('q', !!queue && queue.includes(i));
   });
@@ -2066,6 +2078,9 @@ function renderWResult() {
     li.append(sp); ol.append(li);
   }
   $('wDrill').dataset.ids = weak.map(x => x.i).join(',');
+  const canSkipW = r.score < wholeNeed(L) && wholeFails >= SKIP_AT && !L.wholeSkip && !isDone(L) && reviewing !== L.id;
+  $('skipWhole').hidden = !canSkipW;
+  if (canSkipW) $('wBadge').textContent += ' Đã thử ' + wholeFails + ' lần, có thể tạm bỏ qua phần nói cả bài và luyện lại sau.';
   $('wHeard').textContent = '“' + r.heard + '”';
 }
 function renderWLast() {
@@ -2126,6 +2141,8 @@ function renderList() {
     const ok = l.items.filter((_, i) => (l.best && l.best[i] || 0) >= passFor(l)).length;
     const m = document.createElement('span'); m.className = 'lesson-m';
     const lw = l.whole && l.whole[l.whole.length - 1];
+    const lc = laterCount(l);
+    if (lc) { const tg = document.createElement('span'); tg.className = 'tag later'; tg.textContent = 'Luyện sau ' + lc; t.append(tg); }
     m.textContent = l.items.length + ' câu, đã đạt ' + ok + (lw ? ', cả bài ' + Math.round(lw.score * 100) + '%' : '') + (l.titleVi ? '. ' + l.titleVi : '');
     const meter = document.createElement('span'); meter.className = 'meter';
     const bar = document.createElement('i'); bar.style.width = (l.items.length ? ok / l.items.length * 100 : 0) + '%';
@@ -2152,8 +2169,10 @@ const seqFor = g => (g === 1 ? KID_ORDER : (P.adultOrder ? ADULT_ORDER : null));
 const inSeq = l => { const q = seqFor(groupOf(l)); return !!q && q.includes(l.id); };
 const wholeBest = l => Math.max(0, ...(l.whole || []).map(h => h.score || 0));
 const wholeNeed = l => (groupOf(l) === 1 ? 0.7 : 0.8);
-const sentencesDone = l => l.items.every((_, i) => ((l.best && l.best[i]) || 0) >= passFor(l));
-const isDone = l => sentencesDone(l) && wholeBest(l) >= wholeNeed(l);
+const sentencesDone = l => l.items.every((_, i) => ((l.best && l.best[i]) || 0) >= passFor(l) || !!(l.skip && l.skip[i]));
+const isDone = l => sentencesDone(l) && (wholeBest(l) >= wholeNeed(l) || !!l.wholeSkip);
+// số phần đang tạm bỏ qua, cần luyện lại sau
+const laterCount = l => l.items.filter((_, i) => l.skip && l.skip[i] && !(((l.best && l.best[i]) || 0) >= passFor(l))).length + (l.wholeSkip && wholeBest(l) < wholeNeed(l) ? 1 : 0);
 const hasProgress = l => !!l.started || Object.keys(l.best || {}).length > 0 || (l.whole || []).length > 0;
 function dayCap() { return DAILY_NEW; }
 function startedToday(all, g) { return all.filter(x => groupOf(x) === g && inSeq(x) && x.started === today()).length; }
@@ -2188,7 +2207,8 @@ function renderGate() {
   if (isDone(L)) {
     if (!L.justDone) { g.hidden = true; return; }
     g.classList.add('won');
-    p.textContent = 'Đã qua bài! ' + (nxt ? 'Mở được bài tiếp theo: ' + nxt.title + '.' : 'Bé đã học hết bài mẫu rồi, giỏi quá!');
+    const lc = laterCount(L);
+    p.textContent = 'Đã qua bài! ' + (nxt ? 'Mở được bài tiếp theo: ' + nxt.title + '.' : 'Đã học hết bài mẫu rồi, giỏi quá!') + (lc ? ' Còn ' + lc + ' phần tạm bỏ qua, lúc nào rảnh luyện lại nhé.' : '');
     g.append(p);
     if (nxt) {
       const b = document.createElement('a'); b.className = 'btn primary small'; b.href = '#bai=' + encodeURIComponent(nxt.id);
@@ -2248,7 +2268,7 @@ function route() {
   if (h.startsWith('on=')) {
     const l = lessons().find(x => x.id === h.slice(3));
     if (l) {
-      L = l; L.best = L.best || {}; L.justDone = false; reviewing = l.id;
+      L = l; L.best = L.best || {}; L.justDone = false; reviewing = l.id; wholeFails = 0;
       if (P.group !== groupOf(l)) { P.group = groupOf(l); savePrefs(); }
       queue = null; W.result = null; W.live = null; W.peek = false;
       show('practice');
@@ -2276,7 +2296,7 @@ function route() {
     }
     if (l) {
       if (inSeq(l) && !l.started && !isDone(l)) { l.started = today(); putLesson(l); }
-      L = l; L.best = L.best || {}; L.justDone = false;
+      L = l; L.best = L.best || {}; L.justDone = false; wholeFails = 0;
       if (P.group !== groupOf(l)) { P.group = groupOf(l); savePrefs(); }   // quay lại danh sách đúng tab
       queue = null; W.result = null; W.live = null; W.peek = false;
       show('practice');
@@ -2369,6 +2389,29 @@ $('whole').addEventListener('click', e => {
   playWhole(+s2.dataset.i);
 });
 $('wPeek').addEventListener('click', () => { W.peek = true; render(); });
+$('skipSent').addEventListener('click', () => {
+  if (!L) return;
+  const wasDone = inSeq(L) && isDone(L);
+  L.skip = L.skip || {}; L.skip[idx] = 1;
+  if (inSeq(L) && !wasDone && isDone(L)) L.justDone = true;
+  putLesson(L);
+  track('skip', { what: 'sentence', group: isKid() ? 'kid' : 'adult' });
+  renderGate();
+  const n = nextIndex(1);
+  if (n !== idx && n < L.items.length) go(n); else render();
+});
+$('skipWhole').addEventListener('click', () => {
+  if (!L) return;
+  const wasDone = inSeq(L) && isDone(L);
+  L.wholeSkip = 1;
+  if (inSeq(L) && !wasDone && isDone(L)) L.justDone = true;
+  putLesson(L);
+  track('skip', { what: 'whole', group: isKid() ? 'kid' : 'adult' });
+  $('skipWhole').hidden = true;
+  renderGate();
+  const g = $('gate'); if (!g.hidden && g.scrollIntoView) g.scrollIntoView({ block: 'nearest' });
+  if (!inSeq(L)) say('Đã tạm bỏ qua phần nói cả bài. Lúc nào rảnh luyện lại nhé.');
+});
 $('wDrill').addEventListener('click', () => {
   const ids = ($('wDrill').dataset.ids || '').split(',').filter(Boolean).map(Number);
   if (ids.length) drill(ids);
