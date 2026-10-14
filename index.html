@@ -375,7 +375,7 @@ select.field { height: 44px; padding: 0 10px; }
       <button type="button" data-v="1">Trẻ em</button>
     </div>
     <label class="check" id="orderOpt" hidden><input type="checkbox" id="adultOrder"> Học bài mẫu theo thứ tự (qua bài trước mới mở bài sau)</label>
-    <p class="hint" id="kidRule" hidden>Bài mẫu trẻ em mở lần lượt: đọc đạt hết các câu và nói cả bài đạt 70% thì mở bài tiếp theo. Câu nào hay cả bài thử 3 lần chưa đạt thì được tạm bỏ qua, luyện lại sau. Mỗi ngày học tối đa 4 bài mới.</p>
+    <p class="hint" id="kidRule" hidden>Bài mẫu trẻ em mở lần lượt: đọc đạt hết các câu (từ 80%) và nói cả bài đạt 80% thì mở bài tiếp theo. Câu nào hay cả bài thử 3 lần chưa đạt thì được tạm bỏ qua, luyện lại sau. Mỗi ngày học tối đa 4 bài mới.</p>
     <section class="review" id="reviewBox" hidden>
       <b>Ôn bài cũ</b>
       <p class="hint">Bài đã qua từ một tuần trước. Nói lại cả bài để nhớ lâu hơn.</p>
@@ -674,8 +674,7 @@ function track(name, params) {
 const KEY = K.lessons;
 const PREF = K.prefs;
 const IS_ANDROID = /Android/i.test(navigator.userAgent);
-const PASS = 0.85;
-const PASS_KID = 0.7;              // bài trẻ em: dễ qua hơn
+const PASS = 0.8;                  // trẻ em và người lớn chung một ngưỡng: câu và cả bài đều 80%
 const SKIP_AT = 3;                 // trẻ em và người lớn: sau 3 lần chưa đạt được tạm bỏ qua, luyện sau
 const KID_SLOW_AT = 3;             // trẻ em: sau 3 lần chưa qua thì đọc mẫu chậm lại
 // Từ ngắn máy hay nghe sót ở giọng trẻ em: không tính trượt
@@ -1217,7 +1216,7 @@ function evaluate(en, transcripts, kid) {
   const toks = tokens(en);
   const flat = [], owner = [];
   toks.forEach((t, k) => t.subs.forEach(s => { flat.push(s); owner.push(k); }));
-  let counted = flat.map(w => !kid || !STOP.has(w));
+  let counted = flat.map(() => true);   // mọi từ đều tính, kể cả từ ngắn
   if (!counted.some(Boolean)) counted = flat.map(() => true);
   const total = counted.filter(Boolean).length;
   let best = null;
@@ -1631,7 +1630,7 @@ function evaluateWhole(heard) {
     marks[si] = toks.map(t => (t.subs.length ? true : null));
     per[si] = { hits: 0, total: 0 };
     toks.forEach((t, k) => t.subs.forEach(w => {
-      const c = !kid || !STOP.has(w);
+      const c = true;
       flat.push(w); owner.push([si, k]); counted.push(c);
       if (c) per[si].total++;
     }));
@@ -1856,7 +1855,7 @@ function nextIndex(dir) {
 }
 
 const isKid = () => !!L && groupOf(L) === 1;
-const passFor = l => (l && groupOf(l) === 1 ? PASS_KID : PASS);
+const passFor = () => PASS;
 let tries = 0, sessBestHits = -1, slowIdx = -1;   // tính trong phiên, rời câu là đếm lại
 let wholeFails = 0;   // số lần nói cả bài chưa đạt trong lần mở bài này
 const CHEERS = ['Giỏi quá!', 'Tuyệt vời!', 'Siêu quá!', 'Hay lắm!', 'Xuất sắc!', 'Đỉnh quá!'];
@@ -2054,7 +2053,7 @@ function renderWResult() {
   const box = $('wResult'), r = W.result;
   if (!r) { box.hidden = true; return; }
   box.hidden = false;
-  const pass = r.score >= (isKid() ? 0.75 : 0.9);
+  const pass = r.score >= wholeNeed(L);
   box.classList.toggle('pass', pass); box.classList.toggle('fail', !pass);
   const pct = Math.round(r.score * 100);
   $('wBadge').textContent = isKid()
@@ -2168,9 +2167,9 @@ function today() {
 const seqFor = g => (g === 1 ? KID_ORDER : (P.adultOrder ? ADULT_ORDER : null));
 const inSeq = l => { const q = seqFor(groupOf(l)); return !!q && q.includes(l.id); };
 const wholeBest = l => Math.max(0, ...(l.whole || []).map(h => h.score || 0));
-const wholeNeed = l => (groupOf(l) === 1 ? 0.7 : 0.8);
+const wholeNeed = () => PASS;
 const sentencesDone = l => l.items.every((_, i) => ((l.best && l.best[i]) || 0) >= passFor(l) || !!(l.skip && l.skip[i]));
-const isDone = l => sentencesDone(l) && (wholeBest(l) >= wholeNeed(l) || !!l.wholeSkip);
+const isDone = l => !!l.doneAt || (sentencesDone(l) && (wholeBest(l) >= wholeNeed(l) || !!l.wholeSkip));   // đã qua một lần là giữ
 // số phần đang tạm bỏ qua, cần luyện lại sau
 const laterCount = l => l.items.filter((_, i) => l.skip && l.skip[i] && !(((l.best && l.best[i]) || 0) >= passFor(l))).length + (l.wholeSkip && wholeBest(l) < wholeNeed(l) ? 1 : 0);
 const hasProgress = l => !!l.started || Object.keys(l.best || {}).length > 0 || (l.whole || []).length > 0;
