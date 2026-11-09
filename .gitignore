@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+# dữ liệu xuất từ Firebase có email người dùng: không đưa lên repo
+users.json
+*.export.json
+.env
+.claude/settings.local.json

@@ -1,6 +1,8 @@
 # Luyện tiếng Anh
 
-Hai trang tĩnh, không cần cài đặt hay máy chủ. Mở: https://49gnaht.github.io/SpeakEnglish/
+Hai trang tĩnh, không cần cài đặt hay máy chủ. Mở: https://noitheo.com
+
+Làm việc với code: xem `CLAUDE.md` và thư mục `docs/`. Chạy thử trên máy: `npm start`, test: `npm install && npx playwright install chromium && npm test`.
 
 ## Video (`video.html`)
 
@@ -29,11 +31,11 @@ Luyện nói theo một bài có chữ, ví dụ ảnh chụp một bài đăng.
 4. **Luyện lại các câu còn yếu.** Bấm "Luyện các câu này", trang chỉ đưa bạn qua những câu đó.
 5. **Nói cả bài ở mức Chữ đầu, rồi Che hết.** Khi đã đúng trên 90% ở mức trước thì tăng mức. Hôm sau mở lại, nói cả bài trước để xem mình còn nhớ đến đâu.
 
-Bài mẫu trẻ em mở lần lượt từ dễ đến khó: đọc đạt hết các câu và nói cả bài đúng từ 70% thì mở bài tiếp theo, mỗi ngày tối đa 4 bài mới. Bài người lớn không khóa, trừ khi bật "Học bài mẫu theo thứ tự".
+Bài mẫu (trẻ em và người lớn) mở lần lượt: các câu đạt từ 80% và nói cả bài đạt 80% thì mở bài tiếp theo; thử 3 lần chưa đạt thì được tạm bỏ qua, luyện sau. Mỗi ngày tối đa 4 bài mới.
 
 Phần chấm lời nói chạy tốt nhất trên Chrome và cần mạng. Trình duyệt khác vẫn thu âm và nghe lại được. Trên Chrome Android, phần nhận giọng tự ngắt khi bạn ngừng nói vài giây; trang tự mở lại, nhưng ngừng quá lâu giữa bài có thể mất vài từ.
 
-Bài và kết quả được lưu trong trình duyệt của từng máy.
+Bài và kết quả được lưu trong trình duyệt của từng máy; đăng nhập Google để đồng bộ giữa các máy.
 
 ## Hồ sơ người học và đăng nhập
 

@@ -1,0 +1,12 @@
+{
+  "name": "noitheo",
+  "private": true,
+  "description": "Nói Theo - web luyện nói tiếng Anh (trang tĩnh, không cần build)",
+  "scripts": {
+    "start": "npx --yes serve -l 8000 .",
+    "test": "node tests/run.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.0"
+  }
+}
